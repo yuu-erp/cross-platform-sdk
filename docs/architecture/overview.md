@@ -10,7 +10,8 @@ consumer (C / C++ / FFI)
 src/bindings/c_api       sdk_c_api.cpp, status_mapping.cpp, handles.h  ┐
 src/core/composition_root.cpp  (only place knowing concrete modules)   ┘ compiled into fiaisdk (SHARED)
         v
-src/modules/{network,wallet,smc}/api   placeholder modules       -> fiaisdk_<name>              (STATIC)
+src/modules/network      demo vertical slice (all layers)       -> fiaisdk_network_core/_infra (STATIC)
+src/modules/{wallet,smc}/api   placeholder modules             -> fiaisdk_<name>              (STATIC)
 src/core/infrastructure  SystemClock, NullLogger, InProcessEventBus -> fiaisdk_core_infrastructure (STATIC)
 src/core/application     ports, Module, ModuleRegistry, SdkCore  -> fiaisdk_core_application    (STATIC)
 src/core/domain          Result, Error, StrongType, DomainEvent, SecureBytes -> fiaisdk_core_domain (STATIC)

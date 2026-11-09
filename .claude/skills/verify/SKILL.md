@@ -4,7 +4,8 @@ description: Build, test, format-check, lint and layering-check the SDK and repo
 ---
 # Verify
 
-Run what is available; for each step report the exact command and outcome. If a tool is missing,
+Run what is available; for each step report the exact command and outcome.
+Full guide for humans: `docs/development/testing.md`. If a tool is missing,
 say so — never report a step as passed that was not run.
 
 ```bash

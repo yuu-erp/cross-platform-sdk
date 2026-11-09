@@ -8,7 +8,8 @@ Input: module name `<m>` (snake_case) and its responsibility in one sentence. If
 responsibility or its dependencies on other modules are unclear, ask before creating files.
 
 ## Steps
-1. Read `docs/architecture/target-architecture.md` and one existing module for conventions.
+1. Read `docs/architecture/target-architecture.md` and the reference module `src/modules/network/`
+   (complete vertical slice: domain, application, infrastructure, api, C ABI, wrapper, tests).
 2. Decide which layers are really needed (ADR-0001: proportional). Write the decision in the
    module README.
 3. Create:

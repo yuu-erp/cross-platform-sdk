@@ -76,6 +76,8 @@ FIAISDK_API const char *FIAISDK_CALL fiaisdk_status_message(fiaisdk_status statu
         return "Buffer too small";
     case FIAISDK_STATUS_OUT_OF_MEMORY:
         return "Out of memory";
+    case FIAISDK_STATUS_UNAVAILABLE:
+        return "Unavailable (node or service unreachable or timed out)";
     case FIAISDK_STATUS_INTERNAL_ERROR:
         return "Internal error";
     default:
@@ -114,8 +116,10 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_sdk_create(const fiaisdk_sdk_con
             return toStatus(composed.error());
         }
 
+        auto parts = std::move(composed).value();
         auto handle = std::make_unique<fiaisdk_sdk>();
-        handle->core = std::move(composed).value();
+        handle->core = std::move(parts.core);
+        handle->apis = parts.apis;
         *out_sdk = handle.release();
         return FIAISDK_STATUS_OK;
     } catch (...) {

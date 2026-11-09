@@ -4,6 +4,9 @@ description: Implement a business use case inside a module following Clean Archi
 ---
 # New use case
 
+Reference: `src/modules/network/application/connect_to_node.*` and its tests in
+`tests/unit/network/application/`.
+
 1. Clarify the intent as `<Verb><Noun>` (e.g. `GetBalance`), inputs, outputs, error cases.
    Do not invent remote API shapes — if the backend/RPC contract is unknown, ask for it.
 2. Domain: add/extend value objects & invariants (`domain/`), built on `src/core/domain`

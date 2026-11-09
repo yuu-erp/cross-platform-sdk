@@ -1,6 +1,7 @@
 # Adding a module
 
 AI agents: use the `new-module` skill (`.claude/skills/new-module/SKILL.md`). Humans: same steps.
+Reference implementation of every layer: `src/modules/network/` (see its README).
 
 1. Agree on the module's responsibility (one sentence) and its dependencies; add edges to
    `docs/architecture/module-graph.md` (no cycles).

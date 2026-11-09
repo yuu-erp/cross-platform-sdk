@@ -16,6 +16,7 @@ add_subdirectory(modules/smc)
 #  - bindings: exported symbols in a static lib can be dropped by the linker (Windows).
 #  - composition root: depends on every module, keeping the core targets free of module deps.
 add_library(fiaisdk SHARED
+    bindings/c_api/network_c_api.cpp
     bindings/c_api/sdk_c_api.cpp
     bindings/c_api/status_mapping.cpp
     core/composition_root.cpp
@@ -35,7 +36,7 @@ target_link_libraries(fiaisdk
     PRIVATE
         fiaisdk_compiler_options
         fiaisdk_core_infrastructure
-        fiaisdk_network
+        fiaisdk_network_infra
         fiaisdk_wallet
         fiaisdk_smc
 )

@@ -13,12 +13,16 @@ enum class ErrorCode : std::uint8_t {
     NotInitialized,
     ModuleNotFound,
     ModuleInitFailed,
+    /// A required external resource (node, service, device) cannot be reached or timed out.
+    Unavailable,
     Internal,
 };
 
 /// Failure value carried by Result<T>.
-struct Error {
-    ErrorCode code;
+// The NOLINT silences a clang-analyzer false positive: it cannot model std::variant inside
+// Result and reports the implicit copy of an Error held in the variant as uninitialised.
+struct Error { // NOLINT(clang-analyzer-core.uninitialized.Assign)
+    ErrorCode code = ErrorCode::Internal;
     /// Developer-facing context. Must never contain secrets (keys, seeds, tokens) or user data.
     std::string message;
 
@@ -29,6 +33,9 @@ struct Error {
     }
     [[nodiscard]] static Error notInitialized(std::string text) {
         return {ErrorCode::NotInitialized, std::move(text)};
+    }
+    [[nodiscard]] static Error unavailable(std::string text) {
+        return {ErrorCode::Unavailable, std::move(text)};
     }
     [[nodiscard]] static Error internal(std::string text) {
         return {ErrorCode::Internal, std::move(text)};

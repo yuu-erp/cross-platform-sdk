@@ -4,8 +4,8 @@ Modular, cross-platform (Windows / macOS / Linux) C++20 SDK for the Meta-Node ec
 One shared library (`fiaisdk.dll`, `libfiaisdk.dylib`, `libfiaisdk.so`) exposing a **stable C ABI**
 and a **header-only C++ wrapper** on top of it.
 
-> Status: pre-1.0 scaffold. Modules `wallet`, `smc`, `network` are registered placeholders with
-> no business features yet.
+> Status: pre-1.0. `network` is a complete **demo** vertical slice (connect / disconnect / status,
+> simulated transport); `wallet` and `smc` are registered placeholders.
 
 ## Design in one paragraph
 
@@ -70,7 +70,8 @@ fiaisdk::Sdk sdk({"my-app", "1.0.0"});   // throws fiaisdk::Error on failure
 bool hasWallet = sdk.hasModule("wallet");
 ```
 
-Full reference: [docs/api/sdk.md](docs/api/sdk.md). Install: `cmake --install build/release --prefix <dir>`.
+Full reference: [docs/api/sdk.md](docs/api/sdk.md), [docs/api/network.md](docs/api/network.md).
+Testing: [docs/development/testing.md](docs/development/testing.md). Install: `cmake --install build/release --prefix <dir>`.
 
 ## Repository layout
 

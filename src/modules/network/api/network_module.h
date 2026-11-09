@@ -1,19 +1,36 @@
 #pragma once
 
 #include "core/application/module.h"
+#include "modules/network/api/network_facade.h"
+#include "modules/network/application/ports/i_node_probe.h"
 
+#include <memory>
 #include <string_view>
 
 namespace fiaisdk::network {
 
-/// Lifecycle entry point of the network module. Placeholder: no use cases yet.
+/// Lifecycle of the network module. The probe adapter is injected by the composition root.
 class NetworkModule final : public core::Module {
   public:
     static constexpr std::string_view kName = "network";
 
+    explicit NetworkModule(std::unique_ptr<INodeProbe> probe);
+
     [[nodiscard]] std::string_view name() const noexcept override {
         return kName;
     }
+    [[nodiscard]] core::Result<void> initialize(const core::ModuleContext &context) override;
+    /// Disconnects (publishing NetworkDisconnected{Shutdown}) and releases the facade.
+    void shutdown() noexcept override;
+
+    /// Valid between initialize() and shutdown(); nullptr otherwise.
+    [[nodiscard]] NetworkFacade *facade() noexcept {
+        return facade_.get();
+    }
+
+  private:
+    std::unique_ptr<INodeProbe> probe_;
+    std::unique_ptr<NetworkFacade> facade_;
 };
 
 } // namespace fiaisdk::network

@@ -21,9 +21,13 @@ jobs:
       - name: Layering rules
         run: python3 tools/check_layering.py
       - name: Install clang-format ${{ env.CLANG_FORMAT_VERSION }}
-        run: pipx install "clang-format==${CLANG_FORMAT_VERSION}" && clang-format --version
+        # Own virtualenv + absolute path: a system clang-format earlier in PATH cannot be used.
+        run: |
+          python3 -m venv "$RUNNER_TEMP/cf"
+          "$RUNNER_TEMP/cf/bin/pip" install --quiet "clang-format==${CLANG_FORMAT_VERSION}"
+          "$RUNNER_TEMP/cf/bin/clang-format" --version
       - name: clang-format
-        run: git ls-files '*.h' '*.hpp' '*.c' '*.cpp' | xargs clang-format --dry-run --Werror
+        run: git ls-files '*.h' '*.hpp' '*.c' '*.cpp' | xargs "$RUNNER_TEMP/cf/bin/clang-format" --dry-run --Werror
 
   build:
     name: ${{ matrix.name }}

@@ -24,6 +24,7 @@ enum {
     FIAISDK_STATUS_MODULE_NOT_FOUND = 3,
     FIAISDK_STATUS_BUFFER_TOO_SMALL = 4,
     FIAISDK_STATUS_OUT_OF_MEMORY = 5,
+    FIAISDK_STATUS_UNAVAILABLE = 6, /* node/service unreachable or timed out (since 0.1) */
     FIAISDK_STATUS_INTERNAL_ERROR = 100
 };
 

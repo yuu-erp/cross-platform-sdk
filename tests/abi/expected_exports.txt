@@ -6,3 +6,7 @@ fiaisdk_sdk_has_module
 fiaisdk_status_message
 fiaisdk_version
 fiaisdk_version_number
+fiaisdk_network_connect
+fiaisdk_network_disconnect
+fiaisdk_network_get_endpoint
+fiaisdk_network_get_status

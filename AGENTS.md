@@ -30,6 +30,7 @@ cmake --preset asan  && cmake --build --preset asan  && ctest --preset asan    #
 cmake --preset tsan  && cmake --build --preset tsan  && ctest --preset tsan    # ThreadSanitizer
 cmake --preset msvc  && cmake --build --preset msvc-debug && ctest --preset msvc-debug  # Windows
 python3 tools/check_layering.py            # dependency rules
+# full testing guide: docs/development/testing.md
 clang-format --dry-run --Werror <files>    # formatting
 clang-tidy -p build/debug <files>          # static analysis
 ```
