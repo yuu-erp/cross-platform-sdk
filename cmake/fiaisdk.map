@@ -1,0 +1,7 @@
+/* GNU ld / lld version script: export only the public C ABI (ADR-0002). */
+{
+  global:
+    fiaisdk_*;
+  local:
+    *;
+};

@@ -1,0 +1,3 @@
+add_executable(fiaisdk_example_c main.c)
+target_link_libraries(fiaisdk_example_c PRIVATE FiaiSDK::fiaisdk fiaisdk_compiler_options)
+set_target_properties(fiaisdk_example_c PROPERTIES C_STANDARD 99)

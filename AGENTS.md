@@ -1,0 +1,45 @@
+# AGENTS.md — FiaiSDK
+
+Canonical instructions for AI coding agents (Claude Code, Cursor, Copilot, Codex...) and a
+quick reference for humans. Keep it short; details live in `docs/` and `.claude/rules/`.
+
+## What this is
+Modular, cross-platform (Windows/macOS/Linux) **C++20 SDK** for the Meta-Node ecosystem,
+shipped as **one shared library** exposing a **stable C ABI** plus a header-only C++ wrapper.
+Status: pre-1.0, being rebuilt. Modules wallet/smc/network are placeholders — do not assume any
+feature exists; read the code.
+
+## Read before non-trivial work
+1. `docs/architecture/target-architecture.md` — layout, layer rules, gap list
+2. `docs/adr/` — decisions (Clean Architecture per module, hourglass ABI, naming)
+3. The module you touch + its tests
+
+## Architecture in 6 rules
+1. `include/fiaisdk/*.h` = public C ABI (only exported symbols). `include/fiaisdk/cpp/` = header-only wrapper over it.
+2. Each module: `domain/ → application/ (use cases + ports) ← infrastructure/ (adapters)`, `api/` facade.
+3. Dependencies point inward. Domain/application never include infrastructure, OS headers or 3rd-party I/O libs.
+4. Modules talk only via another module's `api/` facade or the core EventBus — never its internals.
+5. Only `src/core/composition_root.cpp` wires concrete adapters.
+6. Platform-specific code only in `src/platform/{windows,macos,linux}/` behind a port.
+
+## Commands
+```bash
+cmake --preset debug && cmake --build --preset debug && ctest --preset debug   # Linux/macOS
+cmake --preset asan  && cmake --build --preset asan  && ctest --preset asan    # ASan+UBSan
+cmake --preset msvc  && cmake --build --preset msvc-debug && ctest --preset msvc-debug  # Windows
+python3 tools/check_layering.py            # dependency rules
+clang-format --dry-run --Werror <files>    # formatting
+clang-tidy -p build/debug <files>          # static analysis
+```
+
+## Conventions
+- Names: see ADR-0003 (`fiaisdk_` C prefix, `FIAISDK_` macros, `fiaisdk::` namespace, `snake_case` files).
+- Errors: `fiaisdk::kernel::Result<T>` internally; status codes at the C ABI; no exception crosses a module or ABI boundary.
+- Commits: Conventional Commits `type(scope): description`; scopes = module names, `core`, `abi`, `cmake`, `ci`, `docs`.
+- Every behavior change ships with tests; public API change also updates `docs/api/` and an example.
+
+## Hard nos
+- Exporting C++ classes/STL types; changing layout of an existing public struct; reordering status codes.
+- Custom crypto primitives; logging keys/seeds/tokens; disabling TLS/signature verification.
+- New third-party dependency without an ADR. New layer/interface without a second real use.
+- Claiming build/test success without running it. Commits/pushes unless asked.

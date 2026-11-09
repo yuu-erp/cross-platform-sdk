@@ -1,0 +1,21 @@
+build/
+cmake-build-*/
+out/
+.vscode/
+.idea/
+.DS_Store
+*.user
+*.swp
+*.dll
+*.dylib
+*.so
+*.a
+*.lib
+*.pdb
+*.obj
+*.o
+
+# AI local overrides (personal, not shared)
+.claude/settings.local.json
+CLAUDE.local.md
+compile_commands.json

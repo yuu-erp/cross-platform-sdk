@@ -1,0 +1,8 @@
+# Exact list of symbols the shared library must export (one per line, no platform prefix).
+# Adding a public function = adding it here in the same PR. Removing one is an ABI break.
+fiaisdk_sdk_create
+fiaisdk_sdk_destroy
+fiaisdk_sdk_has_module
+fiaisdk_status_message
+fiaisdk_version
+fiaisdk_version_number

@@ -1,0 +1,3 @@
+add_executable(fiaisdk_example_cpp main.cpp)
+target_link_libraries(fiaisdk_example_cpp PRIVATE FiaiSDK::fiaisdk fiaisdk_compiler_options)
+target_compile_features(fiaisdk_example_cpp PRIVATE cxx_std_20)

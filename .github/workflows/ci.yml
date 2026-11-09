@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Layering rules
+        run: python3 tools/check_layering.py
+      - name: clang-format
+        run: |
+          git ls-files '*.h' '*.hpp' '*.c' '*.cpp' | xargs clang-format --dry-run --Werror
+
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-gcc,   os: ubuntu-latest,  preset: debug,      build: debug,      test: debug,      cc: gcc,   cxx: g++ }
+          - { name: linux-clang, os: ubuntu-latest,  preset: debug,      build: debug,      test: debug,      cc: clang, cxx: clang++ }
+          - { name: linux-asan,  os: ubuntu-latest,  preset: asan,       build: asan,       test: asan,       cc: clang, cxx: clang++ }
+          - { name: macos,       os: macos-latest,   preset: debug,      build: debug,      test: debug }
+          - { name: windows-msvc, os: windows-latest, preset: msvc,      build: msvc-debug, test: msvc-debug }
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - run: cmake --preset ${{ matrix.preset }}
+      - run: cmake --build --preset ${{ matrix.build }}
+      - run: ctest --preset ${{ matrix.test }}
+
+  install-consumer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset release && cmake --build --preset release
+      - run: cmake --install build/release --prefix "$PWD/stage"
+      - name: find_package(FiaiSDK) from a separate project
+        run: |
+          cmake -S tests/package -B build/package -G Ninja -DCMAKE_PREFIX_PATH="$PWD/stage"
+          cmake --build build/package
+          LD_LIBRARY_PATH="$PWD/stage/lib" ./build/package/fiaisdk_package_test
