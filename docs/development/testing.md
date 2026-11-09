@@ -1,6 +1,8 @@
 # Testing guide
 
 How to build and run every test locally, what each suite covers, and how to add tests.
+For "I changed X, what do I re-run?" and the pre-push checklist see [workflow.md](workflow.md);
+`tools/check.sh` runs all CI checks in one command.
 CI (`.github/workflows/ci.yml`) runs the same commands on Linux (GCC, Clang, ASan, TSan),
 macOS and Windows (MSVC).
 

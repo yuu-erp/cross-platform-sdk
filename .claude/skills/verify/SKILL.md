@@ -8,6 +8,16 @@ Run what is available; for each step report the exact command and outcome.
 Full guide for humans: `docs/development/testing.md`. If a tool is missing,
 say so — never report a step as passed that was not run.
 
+Preferred: one command that mirrors CI and stops at the first failure:
+
+```bash
+tools/check.sh          # layering + clang-format + debug build (-Werror) + all tests
+tools/check.sh full     # + ASan/UBSan + TSan + clang-tidy + install/find_package
+```
+
+Use `full` for changes to the C ABI, bindings, threading code or CMake (see the table in
+`docs/development/workflow.md`). Manual steps, if the script cannot run:
+
 ```bash
 cmake --preset debug
 cmake --build --preset debug 2>&1 | tail -50

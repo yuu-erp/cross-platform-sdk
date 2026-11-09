@@ -32,7 +32,14 @@ cmake --preset tsan  && cmake --build --preset tsan  && ctest --preset tsan   # 
 cmake --preset msvc && cmake --build --preset msvc-debug && ctest --preset msvc-debug
 ```
 
-Checks used by CI and by AI agents:
+Same checks as CI in one command (see [docs/development/workflow.md](docs/development/workflow.md)):
+
+```bash
+tools/check.sh          # before every commit
+tools/check.sh full     # before push: + ASan, TSan, clang-tidy, install/find_package
+```
+
+Individual checks used by CI and by AI agents:
 
 ```bash
 python3 tools/check_layering.py

@@ -29,8 +29,9 @@ cmake --preset debug && cmake --build --preset debug && ctest --preset debug   #
 cmake --preset asan  && cmake --build --preset asan  && ctest --preset asan    # ASan+UBSan
 cmake --preset tsan  && cmake --build --preset tsan  && ctest --preset tsan    # ThreadSanitizer
 cmake --preset msvc  && cmake --build --preset msvc-debug && ctest --preset msvc-debug  # Windows
+tools/check.sh [full] [--fresh]            # everything CI checks, stops at first failure
 python3 tools/check_layering.py            # dependency rules
-# full testing guide: docs/development/testing.md
+# what to re-run after which change: docs/development/workflow.md; tests: docs/development/testing.md
 clang-format --dry-run --Werror <files>    # formatting
 clang-tidy -p build/debug <files>          # static analysis
 ```

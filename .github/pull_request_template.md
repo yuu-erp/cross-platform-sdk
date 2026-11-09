@@ -5,6 +5,7 @@
 <!-- feat|fix|refactor|test|docs|build|ci(scope) -->
 
 ## Checklist
+- [ ] `tools/check.sh full` passed locally (paste the summary below)
 - [ ] Builds on: [ ] Linux [ ] macOS [ ] Windows (state which were actually run)
 - [ ] `ctest` passes; new behavior has tests (regression test for fixes)
 - [ ] `python3 tools/check_layering.py` clean

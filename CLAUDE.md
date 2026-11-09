@@ -3,7 +3,10 @@
 @AGENTS.md
 
 ## Claude-specific
-- Talk to the project owner in **Vietnamese**; code, comments, docs, commit messages in English.
+- Talk to the project owner in **Vietnamese**; code, comments, docs, commit messages in English
+  (exception: the team workflow guide `docs/development/workflow.md` is in Vietnamese).
+- After every code change run `tools/check.sh` (or `tools/check.sh full` for C ABI, threading,
+  CMake changes) and report its result; see `docs/development/workflow.md` for what to re-run.
 - Path-scoped rules in `.claude/rules/` load automatically for the files you touch — follow them.
 - Use project skills in `.claude/skills/` for recurring work: `new-module`, `new-c-api`,
   `new-use-case`, `write-adr`, `verify`, `review-change`.

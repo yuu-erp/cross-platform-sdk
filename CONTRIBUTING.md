@@ -38,7 +38,11 @@ This document describes the development standards, contribution workflow, and qu
 
 ## 4. Build and Development Workflow
 
-Before submitting changes, ensure that the project can be configured and built successfully.
+Before submitting changes, run `tools/check.sh` (before every commit) and `tools/check.sh full`
+(before pushing). What to re-run after which kind of change is described in
+`docs/development/workflow.md`.
+
+Manual equivalent:
 
 ```bash
 cmake -S . -B build

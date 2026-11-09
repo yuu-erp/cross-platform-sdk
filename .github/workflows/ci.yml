@@ -27,7 +27,20 @@ jobs:
           "$RUNNER_TEMP/cf/bin/pip" install --quiet "clang-format==${CLANG_FORMAT_VERSION}"
           "$RUNNER_TEMP/cf/bin/clang-format" --version
       - name: clang-format
-        run: git ls-files '*.h' '*.hpp' '*.c' '*.cpp' | xargs "$RUNNER_TEMP/cf/bin/clang-format" --dry-run --Werror
+        # On failure every file that needs reformatting is reported as an annotation with the
+        # first lines of the expected change, so the fix is visible without opening the log.
+        run: |
+          CF="$RUNNER_TEMP/cf/bin/clang-format"
+          git ls-files '*.h' '*.hpp' '*.c' '*.cpp' | xargs "$CF" -i
+          if ! git diff --quiet; then
+            for f in $(git diff --name-only); do
+              change=$(git diff -U0 -- "$f" | tail -n +5 | head -n 16 |
+                sed -e ':a' -e 'N' -e '$!ba' -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
+              echo "::error file=$f,title=clang-format ${CLANG_FORMAT_VERSION}::$change"
+            done
+            git diff --stat
+            exit 1
+          fi
 
   build:
     name: ${{ matrix.name }}
