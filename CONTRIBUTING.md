@@ -51,9 +51,10 @@ Run tests:
 ctest --test-dir build --output-on-failure
 ```
 
-Run formatting checks:
+Run formatting checks (CI pins **clang-format 18.1.8**; other major versions format differently):
 
 ```bash
+pipx install clang-format==18.1.8
 clang-format --dry-run --Werror <source-files>
 ```
 
@@ -61,6 +62,7 @@ If static analysis is configured, run the project's `clang-tidy` checks as well.
 
 ## 5. Testing Requirements
 
+- Tests use GoogleTest + GoogleMock (ADR-0004); C ABI tests stay plain C99.
 - Add or update tests for every behavior change.
 - Add unit tests for new business logic.
 - Add integration tests when changing interactions between modules.

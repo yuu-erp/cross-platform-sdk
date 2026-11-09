@@ -1,6 +1,7 @@
 #pragma once
 
-#include "kernel/result.h"
+#include "core/application/module_context.h"
+#include "core/domain/result.h"
 
 #include <string_view>
 
@@ -22,11 +23,14 @@ class Module {
     [[nodiscard]] virtual std::string_view name() const noexcept = 0;
 
     /// Called once, in registration order, before the SDK handle is returned to the caller.
-    [[nodiscard]] virtual kernel::Result<void> initialize() {
+    /// Subscribe to events and keep references to services from `context` here.
+    [[nodiscard]] virtual Result<void> initialize(const ModuleContext &context) {
+        static_cast<void>(context);
         return {};
     }
 
     /// Called once, in reverse order, only for modules whose initialize() succeeded.
+    /// Drop subscriptions and stop work here; shared services are still alive.
     virtual void shutdown() noexcept {}
 };
 

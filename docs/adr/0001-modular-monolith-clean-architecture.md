@@ -16,7 +16,8 @@ infrastructure edge, and shipped as one binary to keep distribution simple.
    Clean Architecture applied where it matters, still one library.
 
 ## Decision
-Option 3. Shared code lives in `src/kernel` (pure) and `src/platform` (OS ports). Layering is
+Option 3. Shared code lives in `src/core` (layered shared kernel, see ADR-0005 — originally a
+separate `src/kernel`) and `src/platform` (OS ports). Layering is
 enforced by CMake targets and `tools/check_layering.py`.
 
 Clean Architecture is applied **proportionally**: a module with no real business rules (e.g. thin

@@ -1,7 +1,7 @@
-// Tests the header-only C++ wrapper exactly as a consumer would use it.
+// Tests the header-only C++ wrapper exactly as a consumer would use it (built as C++17).
 #include <fiaisdk/cpp/sdk.hpp>
 
-#include "test_check.h"
+#include <gtest/gtest.h>
 
 #include <atomic>
 #include <string>
@@ -11,43 +11,44 @@
 
 namespace {
 
-void sdk_constructs_andReportsModules() {
-    fiaisdk::Sdk sdk({"cpp-test", "1.0.0"});
-    CHECK(sdk.native() != nullptr);
-    CHECK(sdk.hasModule("wallet"));
-    CHECK(!sdk.hasModule("nope"));
+TEST(SdkWrapper, ConstructsAndReportsModules) {
+    const fiaisdk::Sdk sdk({"cpp-test", "1.0.0"});
+    EXPECT_NE(sdk.native(), nullptr);
+    EXPECT_TRUE(sdk.hasModule("wallet"));
+    EXPECT_TRUE(sdk.hasModule("smc"));
+    EXPECT_TRUE(sdk.hasModule("network"));
+    EXPECT_FALSE(sdk.hasModule("nope"));
 }
 
-void sdk_move_transfersOwnership() {
+TEST(SdkWrapper, DefaultConstructionIsCopyListInitializable) {
+    const fiaisdk::Sdk sdk = {};
+    EXPECT_NE(sdk.native(), nullptr);
+}
+
+TEST(SdkWrapper, MoveTransfersOwnership) {
     fiaisdk::Sdk a;
     fiaisdk_sdk *raw = a.native();
     fiaisdk::Sdk b(std::move(a));
-    CHECK(b.native() == raw);
-    CHECK(a.native() == nullptr); // NOLINT(bugprone-use-after-move): verifying moved-from state
+    EXPECT_EQ(b.native(), raw);
+    EXPECT_EQ(a.native(), nullptr); // NOLINT(bugprone-use-after-move): verifying moved-from state
 
     fiaisdk::Sdk c;
     c = std::move(b);
-    CHECK(c.native() == raw);
+    EXPECT_EQ(c.native(), raw);
 }
 
-void movedFrom_hasModule_throwsInvalidArgument() {
+TEST(SdkWrapper, MovedFromHasModuleThrowsInvalidArgument) {
     fiaisdk::Sdk a;
-    fiaisdk::Sdk b(std::move(a));
-    bool threw = false;
+    const fiaisdk::Sdk b(std::move(a));
     try {
         (void)a.hasModule("wallet"); // NOLINT(bugprone-use-after-move)
+        FAIL() << "expected fiaisdk::Error";
     } catch (const fiaisdk::Error &e) {
-        threw = e.status() == FIAISDK_STATUS_INVALID_ARGUMENT;
+        EXPECT_EQ(e.status(), FIAISDK_STATUS_INVALID_ARGUMENT);
     }
-    CHECK(threw);
 }
 
-void defaultConstruction_isCopyListInitializable() {
-    fiaisdk::Sdk sdk = {};
-    CHECK(sdk.native() != nullptr);
-}
-
-void hasModule_isSafeConcurrently() {
+TEST(SdkWrapper, HasModuleIsSafeConcurrently) {
     const fiaisdk::Sdk sdk;
     std::atomic<int> wrong{0};
     std::vector<std::thread> threads;
@@ -63,21 +64,11 @@ void hasModule_isSafeConcurrently() {
     for (auto &thread : threads) {
         thread.join();
     }
-    CHECK(wrong.load() == 0);
+    EXPECT_EQ(wrong.load(), 0);
 }
 
-void runtimeVersion_matchesHeader() {
-    CHECK(fiaisdk::runtimeVersion() == FIAISDK_VERSION_STRING);
+TEST(SdkWrapper, RuntimeVersionMatchesHeader) {
+    EXPECT_EQ(fiaisdk::runtimeVersion(), FIAISDK_VERSION_STRING);
 }
 
 } // namespace
-
-int main() {
-    sdk_constructs_andReportsModules();
-    sdk_move_transfersOwnership();
-    movedFrom_hasModule_throwsInvalidArgument();
-    defaultConstruction_isCopyListInitializable();
-    hasModule_isSafeConcurrently();
-    runtimeVersion_matchesHeader();
-    return TEST_RESULT();
-}

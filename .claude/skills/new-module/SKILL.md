@@ -22,9 +22,11 @@ responsibility or its dependencies on other modules are unclear, ask before crea
      api/<m>_facade.{h,cpp}    + <m>_module.{h,cpp} implementing core Module (init/shutdown)
    include/fiaisdk/<m>.h       only if consumers need it now
    src/bindings/c_api/<m>_c_api.cpp
-   tests/unit/<m>/  tests/abi/<m>_abi_test.c
+   tests/unit/<m>/<layer>/  tests/abi/<m>_abi_test.c   (+ fiaisdk_add_gtest in tests/CMakeLists.txt)
    ```
-4. Register in `src/core/composition_root.cpp` (only place that knows concrete adapters).
+4. The module class derives `core::Module` and takes its services from `core::ModuleContext` in
+   `initialize()`. Register it in `src/core/composition_root.cpp` (only place that knows concrete
+   adapters) after the modules it depends on.
 5. `add_subdirectory(src/modules/<m>)` and link into `fiaisdk`.
 6. Add the dependency edge(s) to `docs/architecture/module-graph.md`; ensure no cycle.
 7. Run the `verify` skill.

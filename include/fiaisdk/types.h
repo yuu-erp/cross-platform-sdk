@@ -46,15 +46,22 @@ typedef struct fiaisdk_sdk_config {
     const char *application_version;
 } fiaisdk_sdk_config;
 
-/** Size of the first published layout of fiaisdk_sdk_config. Never changes.
- *  (Public macros avoid casts so C++ consumers building with -Wold-style-cast stay clean.) */
+/* Casts in public macros: C-style in C, static_cast in C++ (consumers may use -Wold-style-cast),
+ * so MSVC (C4267) and GCC/Clang (-Wconversion) see an explicit uint32_t. */
+#ifdef __cplusplus
+#define FIAISDK_U32_(x) static_cast<uint32_t>(x)
+#else
+#define FIAISDK_U32_(x) ((uint32_t)(x))
+#endif
+
+/** Size of the first published layout of fiaisdk_sdk_config. Never changes. */
 #define FIAISDK_SDK_CONFIG_V1_SIZE                                                                 \
-    (offsetof(fiaisdk_sdk_config, application_version) + sizeof(const char *))
+    FIAISDK_U32_(offsetof(fiaisdk_sdk_config, application_version) + sizeof(const char *))
 
 /** Zero-initialised config with struct_size set: `fiaisdk_sdk_config c = FIAISDK_SDK_CONFIG_INIT;`
  */
 #define FIAISDK_SDK_CONFIG_INIT                                                                    \
-    { sizeof(fiaisdk_sdk_config), NULL, NULL }
+    { FIAISDK_U32_(sizeof(fiaisdk_sdk_config)), NULL, NULL }
 
 #ifdef __cplusplus
 }

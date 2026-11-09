@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/module.h"
+#include "core/application/module.h"
 
 #include <string_view>
 

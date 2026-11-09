@@ -15,6 +15,7 @@ from pathlib import Path
 INCLUDE_RE = re.compile(r'^\s*#\s*include\s*([<"])([^>"]+)[>"]')
 SOURCE_EXT = {".h", ".hpp", ".cpp", ".c", ".cc", ".ipp"}
 LAYERS = ("domain", "application", "infrastructure", "api")
+CORE_LAYERS = ("domain", "application", "infrastructure")
 OS_DIRS = ("windows", "macos", "linux")
 
 # Headers that must never appear in domain/ or application/ (I/O, OS, 3rd-party, threads).
@@ -27,24 +28,26 @@ IMPURE_HEADERS = re.compile(
 
 @dataclass(frozen=True)
 class Unit:
-    kind: str  # kernel | platform | platform_os | core | bindings | module | other
-    module: str = ""
-    layer: str = ""  # for modules: domain/application/infrastructure/api/flat
+    kind: str  # core | platform | platform_os | bindings | module | other
+    module: str = ""  # module name ("core" for src/core)
+    layer: str = ""  # domain | application | infrastructure | api | root | flat
 
 
 def classify(rel: Path) -> Unit:
     p = rel.parts
-    if not p or p[0] != "src":
+    if not p or p[0] != "src" or len(p) < 2:
         return Unit("other")
-    if len(p) > 1 and p[1] == "kernel":
-        return Unit("kernel")
-    if len(p) > 1 and p[1] == "platform":
+    if p[1] == "core":
+        if len(p) > 3 and p[2] in CORE_LAYERS:
+            return Unit("core", "core", p[2])
+        if len(p) == 3 and Path(p[2]).stem == "composition_root":
+            return Unit("core", "core", "root")
+        return Unit("core", "core", "misplaced")
+    if p[1] == "platform":
         return Unit("platform_os") if len(p) > 2 and p[2] in OS_DIRS else Unit("platform")
-    if len(p) > 1 and p[1] == "core":
-        return Unit("core")
-    if len(p) > 1 and p[1] == "bindings":
+    if p[1] == "bindings":
         return Unit("bindings")
-    if len(p) > 2 and p[1] == "modules":
+    if p[1] == "modules" and len(p) > 2:
         layer = p[3] if len(p) > 4 and p[3] in LAYERS else "flat"
         return Unit("module", p[2], layer)
     return Unit("other")
@@ -61,36 +64,70 @@ def resolve(src_file: Path, inc: str, root: Path) -> Path | None:
     return None
 
 
-def check_edge(f: Path, src: Unit, dst: Unit) -> str | None:
-    name = f.name
-    if dst.kind == "platform_os" and src.kind != "platform_os" and name != "composition_root.cpp":
-        return "only platform/<os>/ or composition_root may include OS-specific implementations"
-    if src.kind == "kernel" and dst.kind not in ("kernel", "other"):
-        return "kernel must not depend on other src/ code"
-    if src.kind == "core" and dst.kind == "module":
-        if name != "composition_root.cpp":
-            return "core may reference modules only in composition_root.cpp"
+# Which core layers each layer may use (core is the shared kernel of every module).
+CORE_ALLOWED = {
+    "domain": {"domain"},
+    "application": {"domain", "application"},
+    "infrastructure": {"domain", "application", "infrastructure"},
+    "api": {"domain", "application"},
+    "flat": {"domain", "application"},
+}
+# Which layers of the SAME module each layer may use.
+OWN_ALLOWED = {
+    "domain": {"domain"},
+    "application": {"domain", "application"},
+    "infrastructure": {"domain", "application", "infrastructure"},
+    "api": {"domain", "application", "api"},
+    "flat": set(LAYERS) | {"flat"},
+}
+
+
+def check_edge(src: Unit, dst: Unit) -> str | None:
+    composition_root = src.kind == "core" and src.layer == "root"
+    if dst.kind == "platform_os" and src.kind != "platform_os" and not composition_root:
+        return "only platform/<os>/ or the composition root may include OS-specific implementations"
+    if composition_root:
+        return None  # the composition root wires everything together
+
+    if src.kind == "core":
+        if dst.kind == "module":
+            return "core must not depend on modules (only core/composition_root.cpp may)"
+        if dst.kind == "bindings":
+            return "core must not depend on bindings"
+        if dst.kind == "core" and dst.layer not in CORE_ALLOWED[src.layer]:
+            return f"core/{src.layer} must not depend on core/{dst.layer}"
+        if src.layer in ("domain", "application") and dst.kind in ("platform", "platform_os"):
+            return f"core/{src.layer} must not depend on platform (inject a port)"
         return None
-    if src.kind == "module" and dst.kind == "module":
-        if dst.module != src.module:
-            if dst.layer != "api":
-                return f"cross-module access to '{dst.module}/{dst.layer}' (use {dst.module}/api)"
+
+    if src.kind == "module":
+        if dst.kind == "core":
+            if dst.layer == "root":
+                return "modules must not include the composition root"
+            if dst.layer not in CORE_ALLOWED[src.layer]:
+                return f"{src.module}/{src.layer} must not depend on core/{dst.layer}"
             return None
-        allowed = {
-            "domain": {"domain"},
-            "application": {"domain", "application"},
-            "infrastructure": {"domain", "application", "infrastructure"},
-            "api": {"domain", "application", "api"},
-            "flat": set(LAYERS) | {"flat"},
-        }[src.layer]
-        if dst.layer not in allowed:
-            return f"{src.layer} must not depend on {dst.layer}"
+        if dst.kind == "module":
+            if dst.module != src.module:
+                if src.layer == "domain":
+                    return f"domain must not depend on other modules ('{dst.module}')"
+                if dst.layer != "api":
+                    return f"cross-module access to '{dst.module}/{dst.layer}' (use {dst.module}/api)"
+                return None
+            if dst.layer not in OWN_ALLOWED[src.layer]:
+                return f"{src.layer} must not depend on {dst.layer}"
+            return None
+        if dst.kind == "bindings":
+            return "modules must not depend on bindings"
+        if src.layer in ("domain", "application") and dst.kind in ("platform", "platform_os"):
+            return f"{src.layer} must not depend on platform (inject a port)"
         return None
-    if src.kind == "module" and src.layer in ("domain", "application"):
-        if dst.kind in ("core", "bindings", "platform", "platform_os"):
-            return f"{src.layer} must not depend on {dst.kind} (inject a port)"
-    if src.kind == "module" and dst.kind == "bindings":
-        return "modules must not depend on bindings"
+
+    if src.kind == "bindings":
+        if dst.kind == "module" and dst.layer != "api":
+            return f"bindings may only use module facades ('{dst.module}/api'), not {dst.module}/{dst.layer}"
+        if dst.kind in ("platform", "platform_os"):
+            return "bindings must not depend on platform"
     return None
 
 
@@ -107,18 +144,23 @@ def main() -> int:
             continue
         rel = f.relative_to(root)
         src = classify(rel)
+        if src.layer == "misplaced":
+            violations.append(
+                f"{rel}: src/core files must live in domain/, application/ or infrastructure/ "
+                "(only composition_root.{h,cpp} sits directly in src/core)")
+            continue
         for lineno, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             m = INCLUDE_RE.match(line)
             if not m:
                 continue
             inc = m.group(2)
-            if src.kind == "module" and src.layer in ("domain", "application") and IMPURE_HEADERS.match(inc):
+            if src.kind in ("module", "core") and src.layer in ("domain", "application") and IMPURE_HEADERS.match(inc):
                 violations.append(f"{rel}:{lineno}: {src.layer} includes impure header <{inc}>")
                 continue
             target = resolve(f, inc, root)
             if target is None:
                 continue
-            msg = check_edge(f, src, classify(target))
+            msg = check_edge(src, classify(target))
             if msg:
                 violations.append(f"{rel}:{lineno}: {msg}  [#include {inc}]")
 

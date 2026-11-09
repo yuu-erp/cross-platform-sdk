@@ -13,7 +13,7 @@
 | C types | `fiaisdk_<name>` (no `_t` suffix, reserved by POSIX), handles opaque |
 | Macros / constants | `FIAISDK_` (`FIAISDK_API`, `FIAISDK_STATUS_OK`) |
 | CMake options | `FIAISDK_BUILD_TESTS`, `FIAISDK_BUILD_EXAMPLES`, ... |
-| C++ namespace | public wrapper `fiaisdk::` (header-only); internal `fiaisdk::kernel`, `fiaisdk::core`, `fiaisdk::bindings`, modules `fiaisdk::<module>` |
+| C++ namespace | public wrapper `fiaisdk::` (header-only); internal `fiaisdk::core` (all core layers), `fiaisdk::bindings`, tests `fiaisdk::test`, modules `fiaisdk::<module>` |
 | Files | `snake_case.{h,hpp,cpp}`; classes `PascalCase`; functions/methods `camelCase`; members `name_` |
 | Shared library file | `fiaisdk.dll` / `libfiaisdk.dylib` / `libfiaisdk.so.0.<minor>` (pre-1.0 SONAME) |
 

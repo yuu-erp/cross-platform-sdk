@@ -16,9 +16,9 @@ Modular monolith; each module follows Clean Architecture (`domain → applicatio
 
 ## Requirements
 
-- CMake ≥ 3.24, a C99 + C++20 compiler (GCC ≥ 11, Clang ≥ 14, MSVC 2022)
-- Ninja (Linux/macOS presets); Visual Studio 2022 on Windows
-- Optional: clang-format, clang-tidy, Python 3 (layering check)
+- CMake ≥ 3.25, a C99 + C++20 compiler (GCC ≥ 11, Clang ≥ 14, MSVC 2022 or 2026)
+- Ninja (Linux/macOS presets); Visual Studio on Windows (the `msvc` preset picks the newest installed)
+- Optional: clang-format **18.1.8** (`pipx install clang-format==18.1.8`), clang-tidy, Python 3
 
 ## Build & test
 
@@ -26,6 +26,7 @@ Modular monolith; each module follows Clean Architecture (`domain → applicatio
 # Linux / macOS
 cmake --preset debug && cmake --build --preset debug && ctest --preset debug
 cmake --preset asan  && cmake --build --preset asan  && ctest --preset asan   # ASan + UBSan
+cmake --preset tsan  && cmake --build --preset tsan  && ctest --preset tsan   # ThreadSanitizer
 
 # Windows (Developer PowerShell)
 cmake --preset msvc && cmake --build --preset msvc-debug && ctest --preset msvc-debug
@@ -75,11 +76,10 @@ Full reference: [docs/api/sdk.md](docs/api/sdk.md). Install: `cmake --install bu
 
 ```text
 include/fiaisdk/        public C ABI (+ cpp/ header-only wrapper)
-src/kernel/             Result/Error, pure shared code
-src/core/               lifecycle, module registry, composition root
+src/core/               shared kernel: domain/ application/ infrastructure/ + composition root
 src/modules/<name>/     one folder per module (domain/ application/ infrastructure/ api/)
 src/bindings/c_api/     extern "C" implementation
-tests/                  abi/ (C99), cpp/ (wrapper), unit/, package/ (find_package consumer)
+tests/                  abi/ (C99), cpp/ (wrapper), unit/ (GoogleTest), support/, package/
 docs/                   architecture/, adr/, api/, development/
 tools/                  check_layering.py
 .claude/, AGENTS.md     AI agent rules, skills and reviewers (shared with the team)
@@ -89,6 +89,12 @@ tools/                  check_layering.py
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development/adding-a-module.md](docs/development/adding-a-module.md).
 
+## Testing
+
+GoogleTest + GoogleMock v1.17.0 (ADR-0004). CMake uses an installed GTest ≥ 1.17 if found,
+otherwise downloads the pinned commit; offline: `-DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=<checkout>`.
+`ctest --preset debug -R SdkCore` runs one suite.
+
 ## Still to decide (ADRs pending)
 
-Test framework, dependency manager, async/threading model, logging, crypto / HTTP / JSON libraries.
+Dependency manager for runtime libraries, async/threading model, logging, crypto / HTTP / JSON libraries.

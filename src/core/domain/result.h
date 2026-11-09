@@ -1,18 +1,18 @@
 #pragma once
 
-#include "kernel/error.h"
+#include "core/domain/error.h"
 
 #include <optional>
 #include <type_traits>
 #include <utility>
 #include <variant>
 
-namespace fiaisdk::kernel {
+namespace fiaisdk::core {
 
-/// Value-or-error return type used between layers and modules.
+/// Value-or-error return type used between layers and modules (no exceptions across them).
 /// Minimal stand-in for C++23 std::expected; replace when the toolchain baseline allows.
-/// Accessing value() on an error (or error() on a value) is a programming error and throws
-/// std::bad_variant_access.
+/// Calling value() on an error (or error() on a value) is a programming error and throws
+/// std::bad_variant_access / std::bad_optional_access.
 template <class T> class [[nodiscard]] Result {
     static_assert(!std::is_same_v<std::remove_cv_t<T>, Error>, "Result<Error> is ambiguous");
 
@@ -35,7 +35,8 @@ template <class T> class [[nodiscard]] Result {
     [[nodiscard]] const T &value() const & {
         return std::get<0>(data_);
     }
-    [[nodiscard]] T &&value() && {
+    /// Returns by value so `for (auto& x : f().value())` cannot dangle.
+    [[nodiscard]] T value() && {
         return std::get<0>(std::move(data_));
     }
 
@@ -70,4 +71,4 @@ template <> class [[nodiscard]] Result<void> {
     std::optional<Error> error_;
 };
 
-} // namespace fiaisdk::kernel
+} // namespace fiaisdk::core

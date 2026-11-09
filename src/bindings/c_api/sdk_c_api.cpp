@@ -138,7 +138,7 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_sdk_has_module(const fiaisdk_sdk
         return FIAISDK_STATUS_INVALID_ARGUMENT;
     }
     try {
-        *out_available = sdk->core->hasModule(module_name) ? 1U : 0U;
+        *out_available = static_cast<uint8_t>(sdk->core->hasModule(module_name) ? 1U : 0U);
         return FIAISDK_STATUS_OK;
     } catch (...) {
         return statusFromCurrentException();

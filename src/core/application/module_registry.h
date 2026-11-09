@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/module.h"
-#include "kernel/result.h"
+#include "core/application/module.h"
+#include "core/application/module_context.h"
+#include "core/domain/result.h"
 
 #include <cstddef>
 #include <memory>
@@ -10,8 +11,8 @@
 
 namespace fiaisdk::core {
 
-/// Owns modules and drives their lifecycle. Not thread-safe for mutation; lookups (has) are safe
-/// to call concurrently once initialisation finished.
+/// Owns modules and drives their lifecycle. Mutation is not thread-safe; has() is safe to call
+/// concurrently once initialisation finished.
 class ModuleRegistry final {
   public:
     ModuleRegistry() = default;
@@ -23,14 +24,15 @@ class ModuleRegistry final {
     ModuleRegistry &operator=(ModuleRegistry &&other) noexcept;
 
     /// Fails with InvalidArgument for a null module, an empty or duplicate name, or when called
-    /// after initializeAll().
-    [[nodiscard]] kernel::Result<void> add(std::unique_ptr<Module> module);
+    /// after initializeAll() or shutdownAll().
+    [[nodiscard]] Result<void> add(std::unique_ptr<Module> module);
 
     /// Initialise all modules in registration order. On the first failure, already initialised
-    /// modules are shut down in reverse order and the failing module's error is returned.
-    [[nodiscard]] kernel::Result<void> initializeAll();
+    /// modules are shut down in reverse order and ModuleInitFailed is returned. Fails with
+    /// InvalidArgument after shutdownAll() (a registry is initialised at most once).
+    [[nodiscard]] Result<void> initializeAll(const ModuleContext &context);
 
-    /// Shut down initialised modules in reverse order. Idempotent.
+    /// Shut down initialised modules in reverse order. Idempotent and final.
     void shutdownAll() noexcept;
 
     [[nodiscard]] bool has(std::string_view name) const noexcept;
@@ -42,6 +44,7 @@ class ModuleRegistry final {
     std::vector<std::unique_ptr<Module>> modules_;
     std::size_t initializedCount_ = 0;
     bool initialized_ = false;
+    bool finished_ = false; // shutdownAll() ran: no further add/initialize
 };
 
 } // namespace fiaisdk::core

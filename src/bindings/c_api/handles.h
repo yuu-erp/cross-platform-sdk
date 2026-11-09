@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/sdk_core.h"
+#include "core/application/sdk_core.h"
 
 #include <memory>
 

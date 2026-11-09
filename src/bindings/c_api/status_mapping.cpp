@@ -5,16 +5,16 @@
 
 namespace fiaisdk::bindings {
 
-fiaisdk_status toStatus(const kernel::Error &error) noexcept {
+fiaisdk_status toStatus(const core::Error &error) noexcept {
     switch (error.code) {
-    case kernel::ErrorCode::InvalidArgument:
+    case core::ErrorCode::InvalidArgument:
         return FIAISDK_STATUS_INVALID_ARGUMENT;
-    case kernel::ErrorCode::NotInitialized:
+    case core::ErrorCode::NotInitialized:
         return FIAISDK_STATUS_NOT_INITIALIZED;
-    case kernel::ErrorCode::ModuleNotFound:
+    case core::ErrorCode::ModuleNotFound:
         return FIAISDK_STATUS_MODULE_NOT_FOUND;
-    case kernel::ErrorCode::ModuleInitFailed:
-    case kernel::ErrorCode::Internal:
+    case core::ErrorCode::ModuleInitFailed:
+    case core::ErrorCode::Internal:
         return FIAISDK_STATUS_INTERNAL_ERROR;
     }
     return FIAISDK_STATUS_INTERNAL_ERROR;

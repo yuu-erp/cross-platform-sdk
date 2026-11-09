@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 
 project(FiaiSDK
     VERSION 0.1.0
@@ -10,7 +10,9 @@ option(FIAISDK_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
 option(FIAISDK_BUILD_EXAMPLES "Build examples" ${PROJECT_IS_TOP_LEVEL})
 option(FIAISDK_ENABLE_INSTALL "Generate install and package rules" ${PROJECT_IS_TOP_LEVEL})
 option(FIAISDK_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
-option(FIAISDK_ENABLE_SANITIZERS "Build with AddressSanitizer + UBSan (GCC/Clang)" OFF)
+option(FIAISDK_ENABLE_SANITIZERS "Build with sanitizers (GCC/Clang), see FIAISDK_SANITIZERS" OFF)
+set(FIAISDK_SANITIZERS "address,undefined" CACHE STRING
+    "-fsanitize= list when FIAISDK_ENABLE_SANITIZERS is ON (e.g. address,undefined or thread)")
 
 foreach(_part MAJOR MINOR PATCH)
     if(PROJECT_VERSION_${_part} GREATER 255)

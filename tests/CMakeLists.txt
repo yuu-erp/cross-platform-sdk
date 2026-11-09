@@ -1,31 +1,61 @@
-# Test framework not chosen yet (pending ADR); tests use tests/support/test_check.h.
+# Test layout (ADR-0004):
+#   abi/      plain C99 tests of the public C ABI (no framework, tests/support/test_check.h)
+#   cpp/      GoogleTest tests of the header-only C++ wrapper, built as C++17
+#   unit/     GoogleTest unit tests of internal code, mirroring src/ (unit/core/<layer>/...)
+#   support/  shared test doubles (support/core: FakeClock, RecordingLogger, MockEventBus)
+#   package/  standalone find_package(FiaiSDK) consumer, built by CI after install
 
-function(fiaisdk_add_test name)
+include(${PROJECT_SOURCE_DIR}/cmake/GoogleTest.cmake)
+find_package(Threads REQUIRED)
+
+# GoogleTest executable registered per test case with CTest.
+function(fiaisdk_add_gtest name)
     cmake_parse_arguments(T "" "" "SOURCES;LIBS" ${ARGN})
     add_executable(${name} ${T_SOURCES})
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
-    target_link_libraries(${name} PRIVATE fiaisdk_compiler_options ${T_LIBS})
-    add_test(NAME ${name} COMMAND ${name})
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(${name} PRIVATE
+        fiaisdk_compiler_options ${T_LIBS} GTest::gmock GTest::gtest_main Threads::Threads)
+    # PRE_TEST: list tests when ctest runs, not at build time (no DLL lookup during the build).
+    gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST)
 endfunction()
 
-# Public C ABI, compiled as strict C99.
-fiaisdk_add_test(fiaisdk_abi_test SOURCES abi/sdk_abi_test.c LIBS FiaiSDK::fiaisdk)
-set_target_properties(fiaisdk_abi_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+# --- Public C ABI, compiled as strict C99 ------------------------------------------------------
+add_executable(fiaisdk_abi_test abi/sdk_abi_test.c)
+target_include_directories(fiaisdk_abi_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
+target_link_libraries(fiaisdk_abi_test PRIVATE fiaisdk_compiler_options FiaiSDK::fiaisdk)
+set_target_properties(fiaisdk_abi_test PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+if(MSVC)
+    # CHECK(...) on compile-time constants (ABI layout pins) is intentional: C4127.
+    target_compile_options(fiaisdk_abi_test PRIVATE /wd4127)
+endif()
+add_test(NAME fiaisdk_abi_test COMMAND fiaisdk_abi_test)
 
-# Header-only C++ wrapper, as a consumer uses it.
-# Built as C++17: the minimum standard the wrapper promises (propagated by FiaiSDK::fiaisdk).
-find_package(Threads REQUIRED)
-fiaisdk_add_test(fiaisdk_cpp_wrapper_test SOURCES cpp/sdk_wrapper_test.cpp
-                 LIBS FiaiSDK::fiaisdk Threads::Threads)
-set_target_properties(fiaisdk_cpp_wrapper_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+# --- Header-only C++ wrapper, as a consumer uses it ---------------------------------------------
+fiaisdk_add_gtest(fiaisdk_cpp_wrapper_tests
+    SOURCES cpp/sdk_wrapper_test.cpp
+    LIBS FiaiSDK::fiaisdk)
+set_target_properties(fiaisdk_cpp_wrapper_tests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
-# Internal unit tests link internal static targets directly.
-fiaisdk_add_test(fiaisdk_kernel_result_test SOURCES unit/kernel/result_test.cpp LIBS fiaisdk_kernel)
-fiaisdk_add_test(fiaisdk_core_module_registry_test SOURCES unit/core/module_registry_test.cpp LIBS fiaisdk_core)
+# --- Internal unit tests: src/core ---------------------------------------------------------------
+fiaisdk_add_gtest(fiaisdk_core_tests
+    SOURCES
+        unit/core/domain/result_test.cpp
+        unit/core/domain/secure_bytes_test.cpp
+        unit/core/domain/strong_type_test.cpp
+        unit/core/application/logger_test.cpp
+        unit/core/application/module_registry_test.cpp
+        unit/core/application/sdk_core_test.cpp
+        unit/core/application/subscription_test.cpp
+        unit/core/infrastructure/in_process_event_bus_test.cpp
+        unit/core/infrastructure/system_clock_test.cpp
+    LIBS fiaisdk_core_infrastructure)
 
-# Exactly the symbols in abi/expected_exports.txt may be exported.
+# --- Exactly the symbols in abi/expected_exports.txt may be exported -----------------------------
 if(WIN32)
-    find_program(FIAISDK_EXPORT_TOOL NAMES dumpbin)
+    # dumpbin is not on PATH outside a Developer prompt; it lives next to the MSVC linker.
+    get_filename_component(_fiaisdk_linker_dir "${CMAKE_LINKER}" DIRECTORY)
+    find_program(FIAISDK_EXPORT_TOOL NAMES dumpbin HINTS "${_fiaisdk_linker_dir}")
     set(_fiaisdk_export_kind pe)
 elseif(APPLE)
     find_program(FIAISDK_EXPORT_TOOL NAMES nm llvm-nm)

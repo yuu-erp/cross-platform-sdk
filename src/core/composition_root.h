@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/sdk_core.h"
-#include "kernel/result.h"
+#include "core/application/sdk_core.h"
+#include "core/domain/result.h"
 
 #include <memory>
 
 namespace fiaisdk::core {
 
-/// Builds a fully wired SdkCore with all built-in modules and their concrete adapters.
-/// This is the ONLY place that knows concrete module/infrastructure types.
-[[nodiscard]] kernel::Result<std::unique_ptr<SdkCore>> composeSdk(SdkConfig config);
+/// Builds a fully wired SdkCore: default core adapters + all built-in modules.
+/// This is the ONLY place that knows concrete module and adapter types.
+[[nodiscard]] Result<std::unique_ptr<SdkCore>> composeSdk(SdkConfig config);
 
 } // namespace fiaisdk::core

@@ -4,7 +4,8 @@ description: Reviews module structure and dependencies against the SDK's Clean A
 tools: Read, Grep, Glob, Bash
 ---
 You review architecture of a C++20 modular-monolith SDK. Read
-`docs/architecture/target-architecture.md` and `docs/adr/` first, then the changed code.
+`docs/architecture/target-architecture.md`, `src/core/README.md` and `docs/adr/` first, then the
+changed code.
 
 Check:
 1. Run `python3 tools/check_layering.py`; report violations.
@@ -12,7 +13,8 @@ Check:
 3. Ports are owned by application, named by need, minimal; no port without a boundary reason.
 4. Only `src/core/composition_root.cpp` references concrete adapters.
 5. Cross-module access only through `api/` facades or EventBus; no cycles (update module-graph.md).
-6. Core contains no module business logic.
+6. Core contains no module business logic; shared code added to core is needed by ≥ 2 modules;
+   modules reuse core building blocks instead of re-implementing them.
 7. Over-engineering: empty layers, single-use interfaces, factories of factories, speculative generality.
 8. CMake targets mirror the layers (`_core` does not link 3rd-party I/O libs).
 

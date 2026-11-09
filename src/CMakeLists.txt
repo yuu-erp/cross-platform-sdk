@@ -1,13 +1,11 @@
 # Internal targets (never installed, never exported):
-#   fiaisdk_kernel        INTERFACE  Result/Error, pure helpers. Include root = src/.
-#   fiaisdk_core          STATIC     lifecycle, module registry. Knows no concrete module.
-#   fiaisdk_<module>      STATIC     one per module (later split into _core / _infra).
+#   fiaisdk_core_domain          STATIC  Result/Error, StrongType, DomainEvent, SecureBytes
+#   fiaisdk_core_application     STATIC  ports (IClock, ILogger, IEventBus), Module, lifecycle
+#   fiaisdk_core_infrastructure  STATIC  default adapters (SystemClock, NullLogger, event bus)
+#   fiaisdk_<module>             STATIC  one per module (later split per layer)
 # Public target:
-#   fiaisdk               SHARED     C ABI (bindings) + composition root, links everything.
-
-add_library(fiaisdk_kernel INTERFACE)
-target_include_directories(fiaisdk_kernel INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-target_compile_features(fiaisdk_kernel INTERFACE cxx_std_20)
+#   fiaisdk                      SHARED  C ABI (bindings) + composition root, links everything.
+# Include root for all internal code is src/ ("core/domain/result.h", "modules/wallet/...").
 
 add_subdirectory(core)
 add_subdirectory(modules/network)
@@ -16,7 +14,7 @@ add_subdirectory(modules/smc)
 
 # Bindings and the composition root are compiled directly into the shared library:
 #  - bindings: exported symbols in a static lib can be dropped by the linker (Windows).
-#  - composition root: depends on every module, keeping fiaisdk_core free of module deps.
+#  - composition root: depends on every module, keeping the core targets free of module deps.
 add_library(fiaisdk SHARED
     bindings/c_api/sdk_c_api.cpp
     bindings/c_api/status_mapping.cpp
@@ -36,7 +34,7 @@ target_compile_features(fiaisdk INTERFACE cxx_std_17)
 target_link_libraries(fiaisdk
     PRIVATE
         fiaisdk_compiler_options
-        fiaisdk_core
+        fiaisdk_core_infrastructure
         fiaisdk_network
         fiaisdk_wallet
         fiaisdk_smc

@@ -55,7 +55,7 @@ static void test_config_v1_layout_is_frozen(void) {
 static void test_create_accepts_exact_v1_size(void) {
     fiaisdk_sdk_config config = FIAISDK_SDK_CONFIG_INIT;
     fiaisdk_sdk *sdk = NULL;
-    config.struct_size = (uint32_t)FIAISDK_SDK_CONFIG_V1_SIZE;
+    config.struct_size = FIAISDK_SDK_CONFIG_V1_SIZE;
     config.application_name = "v1-caller";
     CHECK(fiaisdk_sdk_create(&config, &sdk) == FIAISDK_STATUS_OK);
     CHECK(sdk != NULL);
@@ -71,7 +71,7 @@ static void test_create_rejects_invalid_arguments(void) {
     CHECK(fiaisdk_sdk_create(NULL, &sdk) == FIAISDK_STATUS_INVALID_ARGUMENT);
     CHECK(sdk == NULL);
 
-    config.struct_size = (uint32_t)(FIAISDK_SDK_CONFIG_V1_SIZE - 1U);
+    config.struct_size = FIAISDK_SDK_CONFIG_V1_SIZE - 1U;
     sdk = (fiaisdk_sdk *)&config;
     CHECK(fiaisdk_sdk_create(&config, &sdk) == FIAISDK_STATUS_INVALID_ARGUMENT);
     CHECK(sdk == NULL);
