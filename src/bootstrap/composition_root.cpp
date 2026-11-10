@@ -1,4 +1,4 @@
-#include "core/composition_root.h"
+#include "bootstrap/composition_root.h"
 
 #include "core/infrastructure/in_process_event_bus.h"
 #include "core/infrastructure/null_logger.h"
@@ -12,13 +12,13 @@
 
 #include <utility>
 
-namespace fiaisdk::core {
+namespace fiaisdk::bootstrap {
 
-Result<ComposedSdk> composeSdk(SdkConfig config) {
-    CoreServices services;
-    services.clock = std::make_unique<SystemClock>();
-    services.logger = std::make_unique<NullLogger>(); // until the logging ADR
-    services.eventBus = std::make_unique<InProcessEventBus>(*services.logger);
+core::Result<ComposedSdk> composeSdk(core::SdkConfig config) {
+    core::CoreServices services;
+    services.clock = std::make_unique<core::SystemClock>();
+    services.logger = std::make_unique<core::NullLogger>(); // until the logging ADR
+    services.eventBus = std::make_unique<core::InProcessEventBus>(*services.logger);
 
     // DEMO transport: replace SimulatedNodeProbe with the real HTTP/WebSocket probe once the
     // transport ADR is decided. Nothing else changes.
@@ -30,7 +30,7 @@ Result<ComposedSdk> composeSdk(SdkConfig config) {
         std::make_unique<crypto::CryptoModule>(std::make_unique<crypto::LibraryCryptoProvider>());
     crypto::CryptoModule *crypto = cryptoModule.get();
 
-    ModuleRegistry modules;
+    core::ModuleRegistry modules;
     if (auto added = modules.add(std::move(cryptoModule)); !added) {
         return added.error();
     }
@@ -48,7 +48,7 @@ Result<ComposedSdk> composeSdk(SdkConfig config) {
         return added.error();
     }
 
-    auto core = SdkCore::create(std::move(config), std::move(services), std::move(modules));
+    auto core = core::SdkCore::create(std::move(config), std::move(services), std::move(modules));
     if (!core) {
         return core.error();
     }
@@ -61,4 +61,4 @@ Result<ComposedSdk> composeSdk(SdkConfig config) {
     return composed;
 }
 
-} // namespace fiaisdk::core
+} // namespace fiaisdk::bootstrap

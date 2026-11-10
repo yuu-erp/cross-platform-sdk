@@ -21,5 +21,5 @@ Status: **demo vertical slice** — real layering and C ABI, simulated transport
 Public C API: `include/fiaisdk/network.h`; C++: `include/fiaisdk/cpp/network.hpp`.
 
 Replacing the demo transport: implement `INodeProbe` in `infrastructure/` with the HTTP/WebSocket
-library chosen by ADR, then swap `SimulatedNodeProbe` in `src/core/composition_root.cpp`.
+library chosen by ADR, then swap `SimulatedNodeProbe` in `src/bootstrap/composition_root.cpp`.
 Nothing in domain/application/api/bindings changes.

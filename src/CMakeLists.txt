@@ -22,7 +22,7 @@ add_library(fiaisdk SHARED
     bindings/c_api/network_c_api.cpp
     bindings/c_api/sdk_c_api.cpp
     bindings/c_api/status_mapping.cpp
-    core/composition_root.cpp
+    bootstrap/composition_root.cpp
 )
 add_library(FiaiSDK::fiaisdk ALIAS fiaisdk)
 

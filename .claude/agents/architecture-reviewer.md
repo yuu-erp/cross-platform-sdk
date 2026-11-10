@@ -11,7 +11,7 @@ Check:
 1. Run `python3 tools/check_layering.py`; report violations.
 2. Logic is in the right layer (rules in domain, orchestration in use cases, I/O in infrastructure).
 3. Ports are owned by application, named by need, minimal; no port without a boundary reason.
-4. Only `src/core/composition_root.cpp` references concrete adapters.
+4. Only `src/bootstrap/composition_root.cpp` references concrete adapters.
 5. Cross-module access only through `api/` facades or EventBus; no cycles (update module-graph.md).
 6. Core contains no module business logic; shared code added to core is needed by ≥ 2 modules;
    modules reuse core building blocks instead of re-implementing them.

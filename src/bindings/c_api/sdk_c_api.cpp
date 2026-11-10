@@ -3,7 +3,7 @@
 
 #include "bindings/c_api/handles.h"
 #include "bindings/c_api/status_mapping.h"
-#include "core/composition_root.h"
+#include "bootstrap/composition_root.h"
 
 #include <fiaisdk/sdk.h>
 #include <fiaisdk/version.h>
@@ -111,7 +111,7 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_sdk_create(const fiaisdk_sdk_con
             sdkConfig.applicationVersion = raw.application_version;
         }
 
-        auto composed = fiaisdk::core::composeSdk(std::move(sdkConfig));
+        auto composed = fiaisdk::bootstrap::composeSdk(std::move(sdkConfig));
         if (!composed) {
             return toStatus(composed.error());
         }

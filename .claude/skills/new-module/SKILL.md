@@ -26,7 +26,7 @@ responsibility or its dependencies on other modules are unclear, ask before crea
    tests/unit/<m>/<layer>/  tests/abi/<m>_abi_test.c   (+ fiaisdk_add_gtest in tests/CMakeLists.txt)
    ```
 4. The module class derives `core::Module` and takes its services from `core::ModuleContext` in
-   `initialize()`. Register it in `src/core/composition_root.cpp` (only place that knows concrete
+   `initialize()`. Register it in `src/bootstrap/composition_root.cpp` (only place that knows concrete
    adapters) after the modules it depends on.
 5. `add_subdirectory(src/modules/<m>)` and link into `fiaisdk`.
 6. Add the dependency edge(s) to `docs/architecture/module-graph.md`; ensure no cycle.

@@ -20,7 +20,7 @@ internal static/object targets. Modules are boundaries inside the library, not b
                               |
                  src/bindings/c_api   (handles, error mapping, catch-all)
                               |
-                 src/core/composition_root.cpp   (wires adapters + modules)
+                 src/bootstrap/composition_root.cpp   (wires adapters + modules)
                               |
      +------------------------+------------------------+
   modules/wallet          modules/smc            modules/network ...
@@ -46,7 +46,8 @@ include/fiaisdk/              PUBLIC, stable C ABI. C99-compatible headers only.
   cpp/                        header-only C++17 wrapper over the C ABI (no exported symbols)
 src/
   core/                       shared kernel, see src/core/README.md
-    domain/ application/ infrastructure/   (+ composition_root.{h,cpp})
+    domain/ application/ infrastructure/
+  bootstrap/                  SDK assembly: composition_root.{h,cpp} (not part of core targets)
   platform/                   ports for OS services + windows/ macos/ linux/ implementations
   modules/<name>/
     domain/                   entities, value objects, rules, events. Uses core/domain only.
@@ -74,17 +75,20 @@ tools/  check_layering.py  (CI + AI verification of dependency rules)
 | `core/domain` | std only | any other `src/` code, I/O, OS, 3rd-party |
 | `core/application` | `core/domain` | `core/infrastructure`, modules, platform, bindings |
 | `core/infrastructure` | `core/application`, `core/domain`, `platform`, 3rd-party | modules, bindings |
-| `core/composition_root.cpp` | everything | — |
+| `bootstrap/composition_root.{h,cpp}` | core services, module APIs/adapters, platform implementations | — |
 | `<m>/domain` | own `domain`, `core/domain` | own application/infrastructure/api, `core/application`, platform, other modules |
 | `<m>/application` | own `domain`, `core/domain`, `core/application`, other modules' `api/` | infrastructure, `core/infrastructure`, platform, bindings |
 | `<m>/infrastructure` | own `domain`/`application`, all `core/` layers, `platform`, 3rd-party | own `api`, bindings, other modules' internals |
 | `<m>/api` | own `domain`/`application`, `core/domain`, `core/application` | infrastructure (wired by composition root), bindings |
-| `bindings/c_api` | `include/fiaisdk`, `core`, module `api/` | module internals |
+| `bindings/c_api` | `include/fiaisdk`, `bootstrap`, `core`, module `api/` | module internals |
 
 Enforcement: (1) `tools/check_layering.py` checks every `#include` (CI + AI verify step);
 (2) the CMake target graph (`fiaisdk_core_domain` ← `_application` ← `_infrastructure`) controls
 linking. All internal targets share the `src/` include root, so (1) is what catches header-only
 violations.
+
+Core/modules/platform must not depend on `bootstrap`; only the C bindings enter the assembly
+layer to create the SDK and obtain facade references. Its namespace is `fiaisdk::bootstrap`.
 
 ## 4. Key policies
 
@@ -100,14 +104,14 @@ violations.
 - **Async**: C ABI uses `callback + void* user_data + request id`; callbacks run on an SDK worker
   thread (documented per function); cancellation via `fiaisdk_cancel(request_id)`. Decide in an ADR
   before the first async API.
-- **Composition root**: only `src/core/composition_root.cpp` knows concrete adapters.
+- **Composition root** ([ADR-0008](../adr/0008-bootstrap-composition-root.md)): only `src/bootstrap/composition_root.cpp` knows concrete adapters.
 
 ## 5. Gap list vs original scaffold (status after 2026-11-09 refactor)
 
 1. ✅ Build broken: headers in `include/fiaisdk/` but code includes `<mysdk/...>`.
 2. ✅ Naming mixed → all `fiaisdk` (ADR-0003).
 3. ✅ C++ class export removed; `include/fiaisdk/cpp/sdk.hpp` is header-only; link-time export list.
-4. ✅ C API → `core::composeSdk` → `SdkCore` (no public C++ in between).
+4. ✅ C API → `bootstrap::composeSdk` → `SdkCore` (no public C++ in between).
 5. ✅ `Module::initialize/shutdown`, ordered init with rollback; only `composition_root.cpp` knows modules.
 6. ⏳ Per-module layers now exist for network, crypto and wallet; smc remains a lifecycle placeholder.
 7. ✅ `fiaisdk_compiler_options` linked by every target; `-Werror` in debug/asan/msvc presets.

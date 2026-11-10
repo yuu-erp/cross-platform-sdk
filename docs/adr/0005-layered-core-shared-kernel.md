@@ -24,7 +24,7 @@ Option 2.
 | `core/domain` → `fiaisdk_core_domain` | `Error`, `Result<T>`, `StrongType`, `DomainEvent`, `Timestamp`, `SecureBytes`, `constantTimeEquals` | std only |
 | `core/application` → `fiaisdk_core_application` | ports `IClock`, `ILogger`, `IEventBus`; `Subscription`, `Logger`; `Module`, `ModuleContext`, `ModuleRegistry`, `SdkCore` | core/domain |
 | `core/infrastructure` → `fiaisdk_core_infrastructure` | `SystemClock`, `NullLogger`, `InProcessEventBus` | core/application, OS, 3rd-party |
-| `core/composition_root.cpp` (in `fiaisdk`) | wiring of adapters + modules | everything |
+| `bootstrap/composition_root.cpp` (in `fiaisdk`) | wiring of adapters + modules | everything |
 
 Module layers may use the core layer of the same or lower level: `<m>/domain` → `core/domain`;
 `<m>/application` and `<m>/api` → `core/domain` + `core/application`; `<m>/infrastructure` →
@@ -36,6 +36,9 @@ What is deliberately **not** in core: generic `Entity`/`UseCase`/`Repository`/`V
 classes (they add inheritance without behaviour; use cases are plain classes with `execute()`;
 an entity is a class with a `StrongType` id), and anything only one module needs. Add a shared
 type here only when a second module needs it.
+
+The composition-root location is amended by [ADR-0008](0008-bootstrap-composition-root.md):
+it lives outside core in `src/bootstrap`, still compiled into the shared library.
 
 ## Consequences
 + One shared vocabulary; modules get clock/logger/event bus via `ModuleContext` (testable).

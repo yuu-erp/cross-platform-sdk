@@ -19,7 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Layering rules
-        run: python3 tools/check_layering.py
+        run: |
+          python3 tools/check_layering.py
+          python3 -m unittest discover -s tools -p test_check_layering.py
       - name: Install clang-format ${{ env.CLANG_FORMAT_VERSION }}
         # Own virtualenv + absolute path: a system clang-format earlier in PATH cannot be used.
         run: |

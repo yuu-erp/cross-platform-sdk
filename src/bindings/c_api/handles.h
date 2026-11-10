@@ -1,7 +1,7 @@
 #pragma once
 
+#include "bootstrap/composition_root.h"
 #include "core/application/sdk_core.h"
-#include "core/composition_root.h"
 
 #include <memory>
 
@@ -10,7 +10,7 @@
 struct fiaisdk_sdk {
     std::unique_ptr<fiaisdk::core::SdkCore> core;
     /// Non-owning; the facades live inside `core`'s modules.
-    fiaisdk::core::ModuleApis apis;
+    fiaisdk::bootstrap::ModuleApis apis;
 };
 
 // Keys and metadata are owned independently of SDK lifetime; signing takes an explicit SDK.

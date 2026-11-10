@@ -10,7 +10,7 @@ Reference implementation of every layer: `src/modules/network/` (see its README)
 3. Add `domain/`, `application/` (+ `ports/`) and `infrastructure/` only when the first real use
    case needs them (ADR-0001).
 4. `add_subdirectory(modules/<name>)` in `src/CMakeLists.txt` and link `fiaisdk_<name>` into `fiaisdk`.
-5. Register it in `src/core/composition_root.cpp` after its dependencies.
+5. Register it in `src/bootstrap/composition_root.cpp` after its dependencies.
 6. Public API: `include/fiaisdk/<name>.h` + `src/bindings/c_api/<name>_c_api.cpp` + C++ wrapper,
    only when consumers need it (`new-c-api` skill). Add `tests/abi/` coverage.
 7. Unit tests under `tests/unit/<name>/`.

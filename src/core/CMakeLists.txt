@@ -4,4 +4,4 @@
 add_subdirectory(domain)         # fiaisdk_core_domain
 add_subdirectory(application)    # fiaisdk_core_application
 add_subdirectory(infrastructure) # fiaisdk_core_infrastructure
-# composition_root.cpp is compiled into the fiaisdk shared library (see src/CMakeLists.txt).
+# ../bootstrap/composition_root.cpp is compiled into the fiaisdk shared library (see src/CMakeLists.txt).

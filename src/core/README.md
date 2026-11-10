@@ -23,12 +23,15 @@ core/
 │   ├── module_context.h   ModuleContext  (clock, logger, eventBus given to modules)
 │   ├── module_registry.*  ordered init, rollback on failure, reverse shutdown
 │   └── sdk_core.*         SdkCore  (config + CoreServices + modules of one instance)
-├── infrastructure/    default adapters, may use OS/3rd-party    -> fiaisdk_core_infrastructure
-│   ├── system_clock.*     SystemClock : IClock
-│   ├── null_logger.h      NullLogger : ILogger  (default until the logging ADR)
-│   └── in_process_event_bus.*  InProcessEventBus : IEventBus  (sync, thread-safe)
-└── composition_root.* the only file that knows concrete adapters and modules
+└── infrastructure/    default adapters, may use OS/3rd-party    -> fiaisdk_core_infrastructure
+    ├── system_clock.*     SystemClock : IClock
+    ├── null_logger.h      NullLogger : ILogger  (default until the logging ADR)
+    └── in_process_event_bus.*  InProcessEventBus : IEventBus  (sync, thread-safe)
 ```
+
+Composition/wiring lives outside the shared kernel in `src/bootstrap/composition_root.{h,cpp}`
+(namespace `fiaisdk::bootstrap`), compiled directly into the shared library. Core and modules
+must not include bootstrap. See [ADR-0008](../../docs/adr/0008-bootstrap-composition-root.md).
 
 ## Which core layer may I use?
 
@@ -37,7 +40,7 @@ core/
 | `core/domain`, `<module>/domain` | ✅ | ❌ | ❌ |
 | `core/application`, `<module>/application`, `<module>/api` | ✅ | ✅ | ❌ |
 | `core/infrastructure`, `<module>/infrastructure` | ✅ | ✅ | ✅ |
-| `core/composition_root.cpp` | ✅ | ✅ | ✅ (+ modules) |
+| `bootstrap/composition_root.cpp` | ✅ | ✅ | ✅ (+ modules) |
 
 Checked by `python3 tools/check_layering.py` (every `#include`, in CI). The CMake target graph
 only controls linking: all internal targets share the `src/` include root.

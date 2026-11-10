@@ -20,7 +20,7 @@ feature exists; read the code.
    `src/core` is the shared kernel, layered the same way — read `src/core/README.md` before adding shared code.
 3. Dependencies point inward. Domain/application never include infrastructure, OS headers or 3rd-party I/O libs.
 4. Modules talk only via another module's `api/` facade or the core EventBus — never its internals.
-5. Only `src/core/composition_root.cpp` wires concrete adapters.
+5. Only `src/bootstrap/composition_root.cpp` wires concrete adapters.
 6. Platform-specific code only in `src/platform/{windows,macos,linux}/` behind a port.
 
 ## Commands

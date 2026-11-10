@@ -60,6 +60,7 @@ build_and_test() { # configure-preset build-preset test-preset
 
 step "layering rules"
 python3 tools/check_layering.py
+python3 -m unittest discover -s tools -p test_check_layering.py
 DONE+=("layering")
 
 step "clang-format"

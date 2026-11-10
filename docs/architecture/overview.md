@@ -8,7 +8,7 @@ consumer (C / C++ / FFI)
         |  include/fiaisdk/*.h  (C ABI)      include/fiaisdk/cpp/*.hpp (header-only, on top of C ABI)
         v
 src/bindings/c_api       sdk_c_api.cpp, status_mapping.cpp, handles.h  ┐
-src/core/composition_root.cpp  (only place knowing concrete modules)   ┘ compiled into fiaisdk (SHARED)
+src/bootstrap/composition_root.cpp  (only place knowing concrete modules)   ┘ compiled into fiaisdk (SHARED)
         v
 src/modules/crypto       hash/random/BLS/secp256k1 (reviewed libraries) -> fiaisdk_crypto_core/_infra (STATIC)
 src/modules/network      demo vertical slice (all layers)       -> fiaisdk_network_core/_infra (STATIC)

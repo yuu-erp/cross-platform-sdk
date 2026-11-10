@@ -28,7 +28,7 @@ IMPURE_HEADERS = re.compile(
 
 @dataclass(frozen=True)
 class Unit:
-    kind: str  # core | platform | platform_os | bindings | module | other
+    kind: str  # bootstrap | core | platform | platform_os | bindings | module | other
     module: str = ""  # module name ("core" for src/core)
     layer: str = ""  # domain | application | infrastructure | api | root | flat
 
@@ -40,9 +40,10 @@ def classify(rel: Path) -> Unit:
     if p[1] == "core":
         if len(p) > 3 and p[2] in CORE_LAYERS:
             return Unit("core", "core", p[2])
-        if len(p) == 3 and Path(p[2]).stem == "composition_root":
-            return Unit("core", "core", "root")
         return Unit("core", "core", "misplaced")
+    if p[1] == "bootstrap":
+        layer = "root" if len(p) == 3 and Path(p[2]).stem == "composition_root" else ""
+        return Unit("bootstrap", layer=layer)
     if p[1] == "platform":
         return Unit("platform_os") if len(p) > 2 and p[2] in OS_DIRS else Unit("platform")
     if p[1] == "bindings":
@@ -83,7 +84,9 @@ OWN_ALLOWED = {
 
 
 def check_edge(src: Unit, dst: Unit) -> str | None:
-    composition_root = src.kind == "core" and src.layer == "root"
+    composition_root = src.kind == "bootstrap" and src.layer == "root"
+    if dst.kind == "bootstrap" and src.kind not in ("bootstrap", "bindings"):
+        return "core, modules and platform must not depend on bootstrap"
     if dst.kind == "platform_os" and src.kind != "platform_os" and not composition_root:
         return "only platform/<os>/ or the composition root may include OS-specific implementations"
     if composition_root:
@@ -91,7 +94,7 @@ def check_edge(src: Unit, dst: Unit) -> str | None:
 
     if src.kind == "core":
         if dst.kind == "module":
-            return "core must not depend on modules (only core/composition_root.cpp may)"
+            return "core must not depend on modules (wiring belongs in bootstrap/composition_root.cpp)"
         if dst.kind == "bindings":
             return "core must not depend on bindings"
         if dst.kind == "core" and dst.layer not in CORE_ALLOWED[src.layer]:
@@ -102,8 +105,6 @@ def check_edge(src: Unit, dst: Unit) -> str | None:
 
     if src.kind == "module":
         if dst.kind == "core":
-            if dst.layer == "root":
-                return "modules must not include the composition root"
             if dst.layer not in CORE_ALLOWED[src.layer]:
                 return f"{src.module}/{src.layer} must not depend on core/{dst.layer}"
             return None
@@ -147,7 +148,7 @@ def main() -> int:
         if src.layer == "misplaced":
             violations.append(
                 f"{rel}: src/core files must live in domain/, application/ or infrastructure/ "
-                "(only composition_root.{h,cpp} sits directly in src/core)")
+                "(SDK assembly belongs in src/bootstrap)")
             continue
         for lineno, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             m = INCLUDE_RE.match(line)

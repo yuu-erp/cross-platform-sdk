@@ -19,7 +19,8 @@ in `src/core/README.md` (use them, do not re-implement clock/logger/event bus/st
 - One use case = one class with one public `execute(...)` returning `Result<T>`; inputs are
   plain structs; no shared mutable state between use cases.
 - Core (`src/core/`) never contains module business logic; add to core only what ≥ 2 modules need.
-  Only `composition_root.cpp` includes concrete infrastructure classes and modules.
+  Only `src/bootstrap/composition_root.cpp` wires concrete adapters and modules.
+  Core, modules and platform must not include bootstrap; bindings call into bootstrap to assemble the SDK.
 - Modules get shared services from `core::ModuleContext` in `initialize()`, never from globals.
 - Cross-module reactions go through `core::IEventBus` (`subscribeTo<Event>`), not direct calls into
   another module's internals.
