@@ -60,10 +60,31 @@ jobs:
       - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install static OpenSSL 3.2+ (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          "$VCPKG_INSTALLATION_ROOT/vcpkg" install openssl:x64-linux
+      - name: Configure (Linux, OpenSSL from vcpkg)
+        if: runner.os == 'Linux'
+        run: cmake --preset ${{ matrix.preset }} ${{ matrix.compilers }} -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-linux
       - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
-        run: brew install ninja
+        run: |
+          brew install ninja openssl@3
+          echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+      - name: Install static OpenSSL 3 (Windows, dynamic CRT)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT/vcpkg.exe" install openssl:x64-windows-static-md
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "OPENSSL_ROOT_DIR=$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static-md" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Configure (Windows, matching Debug/Release crypto libraries)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --preset msvc -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
       - name: Configure
+        if: runner.os == 'macOS'
         run: cmake --preset ${{ matrix.preset }} ${{ matrix.compilers }}
       - name: Build
         run: cmake --build --preset ${{ matrix.build }}
@@ -75,7 +96,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: cmake --preset release && cmake --build --preset release
+      - run: '"$VCPKG_INSTALLATION_ROOT/vcpkg" install openssl:x64-linux'
+      - run: cmake --preset release -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-linux
+      - run: cmake --build --preset release
       - run: cmake --install build/release --prefix "$PWD/stage"
       - name: find_package(FiaiSDK) from a separate project
         run: |

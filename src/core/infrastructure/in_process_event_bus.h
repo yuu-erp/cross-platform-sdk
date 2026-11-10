@@ -3,9 +3,9 @@
 #include "core/application/ports/i_event_bus.h"
 #include "core/application/ports/i_logger.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
-#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -21,6 +21,8 @@ namespace fiaisdk::core {
 /// thread is still running its handler, so after Subscription::cancel() returns the captured
 /// object may be destroyed safely. Subscriptions keep only a weak reference to the bus, so a
 /// Subscription may outlive it. `logger` must outlive the bus; it reports handlers that throw.
+/// Topic snapshots are copied on subscription changes. Publishing does no bus-owned allocation
+/// and visits only the matching topic. This favours frequent events and stable subscriptions.
 class InProcessEventBus final : public IEventBus {
   public:
     explicit InProcessEventBus(ILogger &logger);
@@ -38,17 +40,36 @@ class InProcessEventBus final : public IEventBus {
         const std::string eventName;
         std::mutex mutex;
         std::condition_variable idle;
-        bool active = true;
-        std::vector<std::thread::id> running; // threads currently inside handler
-        Handler handler;                      // reset after cancel to release captures
+        std::atomic<bool> active{true};
+        struct Invocation {
+            std::thread::id thread;
+            Invocation *next = nullptr;
+        };
+        Invocation *running = nullptr; // stack frames linked while holding mutex
+        Handler handler;               // released outside locks once inactive and idle
+        bool registered = false;       // protected by State::mutex
     };
+    using Slots = std::vector<std::shared_ptr<Slot>>;
     struct State {
         mutable std::mutex mutex;
-        std::uint64_t nextId = 1;
-        std::map<std::uint64_t, std::shared_ptr<Slot>> slots; // ordered = subscription order
+        // Immutable snapshots: publishing only copies a shared_ptr, never the vector.
+        std::map<std::string, std::shared_ptr<const Slots>, std::less<>> topics;
+        std::size_t activeCount = 0;
     };
 
-    static void cancelSlot(const std::weak_ptr<State> &state, std::uint64_t id,
+    class InvocationGuard {
+      public:
+        InvocationGuard(Slot &slot, Slot::Invocation &invocation) noexcept;
+        ~InvocationGuard();
+        InvocationGuard(const InvocationGuard &) = delete;
+        InvocationGuard &operator=(const InvocationGuard &) = delete;
+
+      private:
+        Slot *slot_;
+        Slot::Invocation *invocation_;
+    };
+
+    static void cancelSlot(const std::weak_ptr<State> &state,
                            const std::shared_ptr<Slot> &slot) noexcept;
     void invoke(Slot &slot, const DomainEvent &event) noexcept;
 

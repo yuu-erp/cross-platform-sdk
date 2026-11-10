@@ -29,6 +29,52 @@ int main(int argc, char **argv) {
         return fail("fiaisdk_sdk_create", status);
     }
     printf("FiaiSDK %s\n", fiaisdk_version());
+    {
+        const uint8_t message[] = {'a', 'b', 'c'};
+        uint8_t digest[FIAISDK_CRYPTO_SHA256_SIZE];
+        status = fiaisdk_crypto_sha256(sdk, message, sizeof(message), digest, sizeof(digest));
+        if (status != FIAISDK_STATUS_OK) {
+            fiaisdk_sdk_destroy(sdk);
+            return fail("fiaisdk_crypto_sha256", status);
+        }
+        printf("SHA-256 of demo message calculated (%u bytes)\n", (unsigned)sizeof(digest));
+    }
+
+    {
+        const uint8_t message[] = {'a', 'b', 'c'};
+        uint8_t digest[32], signature[96], valid = 0;
+        fiaisdk_wallet *wallet = NULL;
+        fiaisdk_wallet_info info = FIAISDK_WALLET_INFO_INIT;
+        status = fiaisdk_wallet_create(sdk, &wallet);
+        if (status == FIAISDK_STATUS_OK)
+            status = fiaisdk_wallet_get_info(wallet, &info);
+        if (status == FIAISDK_STATUS_OK)
+            status = fiaisdk_wallet_sign(sdk, wallet, FIAISDK_CRYPTO_SCHEME_BLS12381, message,
+                                         sizeof(message), signature, sizeof(signature));
+        if (status == FIAISDK_STATUS_OK)
+            status = fiaisdk_crypto_verify(sdk, FIAISDK_CRYPTO_SCHEME_BLS12381, info.bls_public_key,
+                                           sizeof(info.bls_public_key), message, sizeof(message),
+                                           signature, 96, &valid);
+        if (status == FIAISDK_STATUS_OK && valid == 1)
+            status =
+                fiaisdk_crypto_keccak256(sdk, message, sizeof(message), digest, sizeof(digest));
+        else if (status == FIAISDK_STATUS_OK)
+            status = FIAISDK_STATUS_INTERNAL_ERROR;
+        if (status == FIAISDK_STATUS_OK)
+            status = fiaisdk_wallet_sign(sdk, wallet, FIAISDK_CRYPTO_SCHEME_SECP256K1, digest,
+                                         sizeof(digest), signature, sizeof(signature));
+        if (status == FIAISDK_STATUS_OK)
+            status = fiaisdk_crypto_verify(
+                sdk, FIAISDK_CRYPTO_SCHEME_SECP256K1, info.secp256k1_public_key,
+                sizeof(info.secp256k1_public_key), digest, sizeof(digest), signature, 65, &valid);
+        fiaisdk_wallet_destroy(wallet);
+        if (status != FIAISDK_STATUS_OK || valid != 1) {
+            fiaisdk_sdk_destroy(sdk);
+            return fail("offline wallet",
+                        status == FIAISDK_STATUS_OK ? FIAISDK_STATUS_INTERNAL_ERROR : status);
+        }
+        printf("Offline BLS/secp256k1 signatures verified\n");
+    }
 
     status = fiaisdk_network_connect(sdk, url, 5000);
     if (status != FIAISDK_STATUS_OK) {

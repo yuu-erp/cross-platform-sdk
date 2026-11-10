@@ -12,3 +12,8 @@ struct fiaisdk_sdk {
     /// Non-owning; the facades live inside `core`'s modules.
     fiaisdk::core::ModuleApis apis;
 };
+
+// Keys and metadata are owned independently of SDK lifetime; signing takes an explicit SDK.
+struct fiaisdk_wallet {
+    std::unique_ptr<fiaisdk::wallet::Wallet> value;
+};

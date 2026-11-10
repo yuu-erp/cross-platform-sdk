@@ -109,7 +109,7 @@ violations.
 3. ✅ C++ class export removed; `include/fiaisdk/cpp/sdk.hpp` is header-only; link-time export list.
 4. ✅ C API → `core::composeSdk` → `SdkCore` (no public C++ in between).
 5. ✅ `Module::initialize/shutdown`, ordered init with rollback; only `composition_root.cpp` knows modules.
-6. ⏳ No domain/application/infrastructure layers yet (no use cases yet — by design).
+6. ⏳ Per-module layers now exist for network, crypto and wallet; smc remains a lifecycle placeholder.
 7. ✅ `fiaisdk_compiler_options` linked by every target; `-Werror` in debug/asan/msvc presets.
 8. ✅ Registry lookup compares `std::string_view`, no allocation.
 9. ✅ `FIAISDK_SDK_CONFIG_V1_SIZE` + normalisation; tested with a larger future struct.

@@ -5,7 +5,8 @@ One shared library (`fiaisdk.dll`, `libfiaisdk.dylib`, `libfiaisdk.so`) exposing
 and a **header-only C++ wrapper** on top of it.
 
 > Status: pre-1.0. `network` is a complete **demo** vertical slice (connect / disconnect / status,
-> simulated transport); `wallet` and `smc` are registered placeholders.
+> simulated transport). `crypto` provides hash/random/BLS/secp256k1 operations;
+> `wallet` provides an in-memory offline dual-key wallet; `smc` remains a placeholder.
 
 ## Design in one paragraph
 
@@ -105,4 +106,11 @@ otherwise downloads the pinned commit; offline: `-DFETCHCONTENT_SOURCE_DIR_GOOGL
 
 ## Still to decide (ADRs pending)
 
-Dependency manager for runtime libraries, async/threading model, logging, crypto / HTTP / JSON libraries.
+Runtime crypto providers: OpenSSL >=3.2, blst and libsecp256k1 (statically linked), see
+[crypto API and build requirements](docs/api/crypto.md) and [ADR-0006](docs/adr/0006-minimal-crypto-provider.md).
+Wallet key/address formats are specified in ADR-0007. Persistence/mnemonics, other runtime libraries, async/threading and logging remain open.
+
+The offline wallet supports independent BLS/secp256k1 keys, two addresses, import, signing and
+verification without private-key export or persistence. See [wallet API](docs/api/wallet.md).
+Build hosts need OpenSSL >=3.2 static libcrypto and initial network access for pinned signing
+libraries; see [crypto build requirements](docs/api/crypto.md).

@@ -69,3 +69,46 @@ core::Result<void> WalletModule::initialize(const core::ModuleContext& context) 
 
 Tests use the shared doubles in `tests/support/core/`: `FakeClock`, `RecordingLogger`,
 `MockEventBus` (gMock), or the real `InProcessEventBus`.
+
+## Reusing the event bus
+
+Use the `IEventBus` supplied by `ModuleContext`; do not create a bus per module. Define an
+immutable event derived from `DomainEvent`, with a unique `kName` (`"<module>.<event>"`) and a
+timestamp supplied by `IClock`. Use `subscribeTo<Event>()` for typed delivery, and store the
+returned `Subscription` in the receiving module. Publish events after releasing module locks:
+handlers run synchronously and may call back into the publisher.
+
+```cpp
+// During initialize(context):
+onConnected_ = core::subscribeTo<network::NetworkConnected>(
+    context.eventBus(), [this](const network::NetworkConnected& event) {
+        // Copy the data needed by this module; do not retain a reference to event.
+    });
+
+// At the start of shutdown(), before destroying state captured by the handler:
+onConnected_.cancel();
+```
+
+Cancel explicitly before destroying callback-visible state. A subscription member's destructor
+alone is insufficient if other members have already been destroyed. Different publishing
+threads may invoke the same handler concurrently: synchronize its mutable state. Do not cancel
+mutually dependent running handlers from each other (see `IEventBus`'s deadlock restriction).
+Destroy the bus/SDK only after all publishing/subscribing threads have stopped.
+
+`InProcessEventBus` indexes subscriptions by event name and shares immutable per-topic snapshots.
+For `T` topics and `K` matching subscriptions, publish costs `O(log T + K)` instead of scanning
+all subscriptions; it performs no bus-owned heap allocation on normal delivery. Handler code
+and exception logging can still allocate. Subscribe/cancel copy a topic's snapshot (`O(K)`),
+so this implementation favours frequent publishing and relatively stable subscriptions. An
+in-flight publish keeps its old snapshot alive; a cancelled handler is skipped even if present
+in that snapshot. New subscribers participate in subsequent (including nested) publishes.
+
+Subscribe is transactional: allocation failure exposes no handler. Cancellation deactivates
+first, waits for other threads' calls, and destroys captures outside bus locks. Self-cancellation
+releases captures after the last invocation returns. If snapshot pruning runs out of memory,
+inactive slot metadata may remain until a later topic update; callbacks stay disabled and their
+captures are still released. Delivery is synchronous and best effort, without persistence,
+retries, a worker pool, or global ordering between publishing threads.
+
+Allocation-failure tests run in `fiaisdk_event_bus_allocation_tests`, a separate executable so
+its replacement allocator does not affect other test suites.

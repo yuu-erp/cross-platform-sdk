@@ -1,4 +1,11 @@
 #include "modules/wallet/api/wallet_module.h"
-
-// Intentionally empty until the wallet module gets its first use case.
-// Kept so the module already has its own CMake target and translation unit.
+namespace fiaisdk::wallet {
+core::Result<void> WalletModule::initialize(const core::ModuleContext &context) {
+    static_cast<void>(context);
+    facade_ = std::make_unique<WalletFacade>(*crypto_);
+    return {};
+}
+void WalletModule::shutdown() noexcept {
+    facade_.reset();
+}
+} // namespace fiaisdk::wallet

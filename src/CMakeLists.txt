@@ -8,6 +8,7 @@
 # Include root for all internal code is src/ ("core/domain/result.h", "modules/wallet/...").
 
 add_subdirectory(core)
+add_subdirectory(modules/crypto)
 add_subdirectory(modules/network)
 add_subdirectory(modules/wallet)
 add_subdirectory(modules/smc)
@@ -16,6 +17,8 @@ add_subdirectory(modules/smc)
 #  - bindings: exported symbols in a static lib can be dropped by the linker (Windows).
 #  - composition root: depends on every module, keeping the core targets free of module deps.
 add_library(fiaisdk SHARED
+    bindings/c_api/crypto_c_api.cpp
+    bindings/c_api/wallet_c_api.cpp
     bindings/c_api/network_c_api.cpp
     bindings/c_api/sdk_c_api.cpp
     bindings/c_api/status_mapping.cpp
@@ -36,6 +39,7 @@ target_link_libraries(fiaisdk
     PRIVATE
         fiaisdk_compiler_options
         fiaisdk_core_infrastructure
+        fiaisdk_crypto_infra
         fiaisdk_network_infra
         fiaisdk_wallet
         fiaisdk_smc

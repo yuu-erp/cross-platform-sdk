@@ -10,3 +10,12 @@ fiaisdk_network_connect
 fiaisdk_network_disconnect
 fiaisdk_network_get_endpoint
 fiaisdk_network_get_status
+fiaisdk_crypto_sha256
+fiaisdk_crypto_random_bytes
+fiaisdk_crypto_keccak256
+fiaisdk_crypto_verify
+fiaisdk_wallet_create
+fiaisdk_wallet_import
+fiaisdk_wallet_get_info
+fiaisdk_wallet_sign
+fiaisdk_wallet_destroy

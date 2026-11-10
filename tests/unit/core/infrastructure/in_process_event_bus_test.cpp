@@ -197,5 +197,90 @@ TEST_F(InProcessEventBusTest, ConcurrentSubscribePublishCancelIsSafe) {
     EXPECT_EQ(bus_.subscriberCount(), 1U);
 }
 
+TEST_F(InProcessEventBusTest, SubscribeDuringPublishAppliesToNextSnapshot) {
+    std::vector<int> calls;
+    Subscription added;
+    auto first = bus_.subscribe("wallet.created", [&](const DomainEvent &) {
+        calls.push_back(1);
+        if (!added.active()) {
+            added =
+                bus_.subscribe("wallet.created", [&](const DomainEvent &) { calls.push_back(3); });
+        }
+    });
+    auto second =
+        bus_.subscribe("wallet.created", [&](const DomainEvent &) { calls.push_back(2); });
+    bus_.publish(WalletCreated(clock_.now(), "w"));
+    EXPECT_THAT(calls, ElementsAre(1, 2));
+    calls.clear();
+    bus_.publish(WalletCreated(clock_.now(), "w"));
+    EXPECT_THAT(calls, ElementsAre(1, 2, 3));
+}
+
+TEST_F(InProcessEventBusTest, CancellingLaterHandlerSkipsItInExistingSnapshot) {
+    int calls = 0;
+    Subscription later;
+    auto first = bus_.subscribe("wallet.created", [&](const DomainEvent &) { later.cancel(); });
+    later = bus_.subscribe("wallet.created", [&](const DomainEvent &) { ++calls; });
+    bus_.publish(WalletCreated(clock_.now(), "w"));
+    EXPECT_EQ(calls, 0);
+    EXPECT_EQ(bus_.subscriberCount(), 1U);
+}
+
+TEST_F(InProcessEventBusTest, SelfCancelReleasesCapturesAfterCallbackReturns) {
+    auto owned = std::make_shared<int>(1);
+    const std::weak_ptr<int> watch = owned;
+    Subscription self;
+    self = bus_.subscribe("wallet.created", [&, owned](const DomainEvent &) {
+        self.cancel();
+        EXPECT_FALSE(watch.expired());
+    });
+    owned.reset();
+    auto later = bus_.subscribe("wallet.created", [&](const DomainEvent &) {
+        EXPECT_TRUE(watch.expired()); // the original publish snapshot is still alive
+    });
+    bus_.publish(WalletCreated(clock_.now(), "w"));
+    EXPECT_TRUE(watch.expired());
+}
+
+TEST_F(InProcessEventBusTest, CaptureDestructionMayReenterTheBus) {
+    struct Capture {
+        InProcessEventBus *bus;
+        std::size_t *seen;
+        ~Capture() {
+            *seen = bus->subscriberCount();
+        }
+    };
+    std::size_t seen = 99;
+    auto capture = std::make_shared<Capture>();
+    capture->bus = &bus_;
+    capture->seen = &seen;
+    auto subscription = bus_.subscribe("wallet.created", [capture](const DomainEvent &) {});
+    capture.reset();
+    subscription.cancel();
+    EXPECT_EQ(seen, 0U);
+}
+
+TEST_F(InProcessEventBusTest, NestedSelfCancelWaitsUntilOutermostCallReturns) {
+    int depth = 0;
+    auto owned = std::make_shared<int>(1);
+    const std::weak_ptr<int> watch = owned;
+    Subscription self;
+    self = bus_.subscribe("wallet.created", [&, owned](const DomainEvent &event) {
+        if (++depth == 1) {
+            bus_.publish(event);
+        } else {
+            self.cancel();
+        }
+        EXPECT_FALSE(watch.expired());
+        --depth;
+    });
+    owned.reset();
+    auto later = bus_.subscribe(
+        "wallet.created", [&](const DomainEvent &) { EXPECT_EQ(watch.expired(), depth == 0); });
+    bus_.publish(WalletCreated(clock_.now(), "w"));
+    EXPECT_TRUE(watch.expired());
+    EXPECT_EQ(bus_.subscriberCount(), 1U);
+}
+
 } // namespace
 } // namespace fiaisdk::core

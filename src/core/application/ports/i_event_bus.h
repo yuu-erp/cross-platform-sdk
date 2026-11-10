@@ -16,7 +16,12 @@ namespace fiaisdk::core {
 /// Delivery contract (all implementations):
 /// - publish() calls matching handlers synchronously on the publishing thread, in subscription
 ///   order, and never throws: a throwing handler is logged and the others still run.
-/// - subscribe/publish/cancel are thread-safe.
+/// - subscribe/publish/cancel are thread-safe across different Subscription handles. A single
+///   Subscription handle requires external synchronization if accessed by multiple threads.
+/// - A publish uses a subscription snapshot: newly subscribed handlers join the next publish
+///   (including a nested publish); handlers cancelled before invocation are skipped.
+/// - The event is borrowed only for the duration of publish(). Handlers must copy data they
+///   retain and must tolerate concurrent invocations by different publishing threads.
 /// - When Subscription::cancel() (or its destructor) returns, the handler is not running on any
 ///   other thread and will not be called again, so the objects it captures may be destroyed.
 ///   Cancelling from inside the same handler does not wait for itself.
