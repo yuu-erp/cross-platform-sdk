@@ -14,6 +14,7 @@ namespace fiaisdk::network {
 /// Endpoint in the system is valid. Rules:
 /// - scheme https, wss, http or ws (case-insensitive); http/ws only for the loopback hosts
 ///   localhost, 127.0.0.1 and [::1] — everything else must use TLS;
+/// - tcp requires an explicit port and has no path, query or fragment;
 /// - no user-info ("user:pass@host") so credentials never travel inside URLs;
 /// - host: DNS name or IPv4 (ASCII labels of letters, digits, '-', 1..63 chars, no leading or
 ///   trailing '-'), or an IPv6 literal in brackets; parsing is locale-independent;
@@ -21,7 +22,7 @@ namespace fiaisdk::network {
 /// - at most 2048 characters, no whitespace or control characters.
 class Endpoint {
   public:
-    enum class Scheme : std::uint8_t { Https, Wss, Http, Ws };
+    enum class Scheme : std::uint8_t { Https, Wss, Http, Ws, Tcp };
 
     static constexpr std::size_t kMaxLength = 2048;
 

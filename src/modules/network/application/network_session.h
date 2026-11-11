@@ -1,5 +1,6 @@
 #pragma once
 
+#include "modules/network/application/ports/i_node_connector.h"
 #include "modules/network/domain/connection_info.h"
 
 #include <chrono>
@@ -15,7 +16,7 @@ namespace fiaisdk::network {
 /// Current connection of one SDK instance. Thread-safe.
 ///
 /// Two locks: the operation lock serialises connect/disconnect (which may block on I/O), while
-/// current() stays cheap and never waits for a probe in progress.
+/// current() stays cheap and never waits for a connection attempt in progress.
 ///
 /// Every state change gets the next sequence number. Events are published after the locks are
 /// released, so subscribers on different threads may observe them out of order; the sequence
@@ -61,11 +62,17 @@ class NetworkSession {
         return current_;
     }
 
+    [[nodiscard]] bool peerClosed() const {
+        const std::scoped_lock lock(stateMutex_);
+        return connection_ && connection_->peerClosed();
+    }
+
     /// Stores `info`; returns the sequence number of this change.
-    std::uint64_t
-    set(ConnectionInfo info) noexcept(std::is_nothrow_move_assignable_v<ConnectionInfo>) {
+    std::uint64_t set(ConnectionInfo info, std::unique_ptr<NodeConnection> connection) noexcept(
+        std::is_nothrow_move_assignable_v<ConnectionInfo>) {
         const std::scoped_lock lock(stateMutex_);
         current_ = std::move(info);
+        connection_.swap(connection);
         return ++sequence_;
     }
 
@@ -76,18 +83,21 @@ class NetworkSession {
 
     /// Atomically replaces the current connection with `info` (readers never see a gap).
     /// Consumes two sequence numbers: one for the implied disconnect, one for the connect.
-    Replaced
-    replace(ConnectionInfo info) noexcept(std::is_nothrow_move_assignable_v<ConnectionInfo>) {
+    Replaced replace(ConnectionInfo info, std::unique_ptr<NodeConnection> connection) noexcept(
+        std::is_nothrow_move_assignable_v<ConnectionInfo>) {
         const std::scoped_lock lock(stateMutex_);
         current_ = std::move(info);
+        connection_.swap(connection);
         const std::uint64_t disconnect = ++sequence_;
         return {disconnect, ++sequence_};
     }
 
     /// Clears the connection; returns the sequence number of this change.
     std::uint64_t clear() noexcept {
+        std::unique_ptr<NodeConnection> closed;
         const std::scoped_lock lock(stateMutex_);
         current_.reset();
+        connection_.swap(closed);
         return ++sequence_;
     }
 
@@ -127,6 +137,7 @@ class NetworkSession {
 
     mutable std::mutex stateMutex_;
     std::optional<ConnectionInfo> current_;
+    std::unique_ptr<NodeConnection> connection_;
     std::uint64_t sequence_ = 0;
 };
 

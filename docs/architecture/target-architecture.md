@@ -92,7 +92,9 @@ layer to create the SDK and obtain facade references. Its namespace is `fiaisdk:
 
 ## 4. Key policies
 
-- **ABI**: only C functions are exported. C++ API is header-only inline on top of C ABI (hourglass).
+- **ABI** ([ADR-0009](../adr/0009-public-api-data-contract.md)): only typed C functions are exported.
+  C++ API is header-only inline on top of the C ABI. A future message adapter lives outside the
+  core library and calls only the public API.
 - **Errors**: internal `fiaisdk::core::Result<T>` (until C++23 `std::expected` is allowed). No exceptions
   across module boundaries; every C entry point has `try { } catch (...)` mapping to a status code.
 - **Status codes**: `typedef int32_t fiaisdk_status;` + `#define`/enum constants — never pass a C
@@ -101,7 +103,7 @@ layer to create the SDK and obtain facade references. Its namespace is `fiaisdk:
   never reorder or remove fields; append only.
 - **Memory**: caller-allocated buffers with `size_t* inout_len` pattern, or SDK-owned objects freed
   by a matching `fiaisdk_<x>_free`. Never `free()` across the boundary.
-- **Async**: C ABI uses `callback + void* user_data + request id`; callbacks run on an SDK worker
+- **Async** ([ADR-0009](../adr/0009-public-api-data-contract.md)): C ABI uses `callback + void* user_data + request id`; callbacks run on an SDK worker
   thread (documented per function); cancellation via `fiaisdk_cancel(request_id)`. Decide in an ADR
   before the first async API.
 - **Composition root** ([ADR-0008](../adr/0008-bootstrap-composition-root.md)): only `src/bootstrap/composition_root.cpp` knows concrete adapters.

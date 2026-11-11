@@ -1,88 +1,85 @@
-# Network API (`fiaisdk/network.h`, `fiaisdk/cpp/network.hpp`)
+# Network API
 
-> **Demo transport.** This version simulates the node (no network I/O): hosts ending in
-> `.invalid` are unreachable, every other valid host connects with a deterministic 5–49 ms
-> latency. The API is intended to stay stable when the real HTTP/WebSocket transport lands.
+The default composition opens a TCP socket to one endpoint per SDK instance. It accepts
+`tcp://127.0.0.1:9545` and `tcp://[::1]:9545` forms. Use a numeric IPv4 or IPv6 address and an
+explicit port from 1 to 65535. The TCP adapter does not resolve DNS names. Credentials, paths, queries and fragments are invalid.
+The HTTP and WebSocket URLs used by the previous simulated adapter are unsupported by the
+default TCP adapter.
 
-## Functions
+`CONNECTED` means the SDK holds a socket that completed the TCP handshake.
+This transport uses plaintext TCP. Meta-Node initialization is pending. `latency_ms` measures
+the time spent establishing the socket. Status and endpoint reads check for an observable peer
+close and clear the session when detected. The check preserves incoming data. A close behind
+unread data can remain undetected, and a silent network outage may produce no socket error.
 
-| Function | Purpose | Blocks | Returns |
-|---|---|---|---|
-| `fiaisdk_network_connect(sdk, url, timeout_ms)` | connect, replacing the current connection on success | ≤ ~`timeout_ms` in total (incl. waiting for a concurrent call) | `OK`, `INVALID_ARGUMENT`, `UNAVAILABLE`, `MODULE_NOT_FOUND`, `OUT_OF_MEMORY` |
-| `fiaisdk_network_disconnect(sdk)` | close the connection (OK if none) | waits for a connect in progress | `OK`, `INVALID_ARGUMENT` |
-| `fiaisdk_network_get_status(sdk, &status)` | state, latency, connected-at | never waits for a connect | `OK`, `INVALID_ARGUMENT` |
-| `fiaisdk_network_get_endpoint(sdk, buf, &size)` | normalised URL (two-call size protocol) | no | `OK`, `BUFFER_TOO_SMALL`, `INVALID_ARGUMENT` |
+- `fiaisdk_network_connect` accepts 1–60000 ms, including time spent waiting for a concurrent
+  operation. Invalid or unsupported endpoints return `INVALID_ARGUMENT`. Socket errors
+  such as connection refusal or timeout return `UNAVAILABLE`.
+- Connecting again to the same endpoint returns OK. A successful switch closes the old
+  socket. A failed switch preserves the old connection.
+- `fiaisdk_network_disconnect` waits for any connect in progress and closes the socket.
+  Calling it while disconnected succeeds. SDK destruction also closes the socket.
+- Status reads do not wait for network I/O. Initialize the extensible 24-byte status struct
+  with `FIAISDK_NETWORK_STATUS_INIT`. Unknown future fields are preserved.
+- Endpoint reads return the normalized URL, or an empty string while disconnected.
+  Query the required size with a null buffer and size zero. The size includes the NUL
+  terminator. An undersized buffer is left untouched.
+- SDK destruction must not race operations using the SDK instance.
 
-All functions are thread-safe; connect/disconnect calls are serialised. None may run concurrently
-with `fiaisdk_sdk_destroy`. Every function may also return `MODULE_NOT_FOUND`, `OUT_OF_MEMORY` or
-`INTERNAL_ERROR`. `get_endpoint` sets `*size` to the required size on `OK`/`BUFFER_TOO_SMALL`
-and to 0 on any other error.
+## C and C++
 
-## Behaviour
-
-- Connecting again to the same endpoint (after normalisation) is a no-op returning `OK`.
-- Switching endpoints is all-or-nothing: if the new node is unreachable the old connection stays.
-- `timeout_ms` must be 1..60000.
-- Destroying the SDK while connected disconnects cleanly.
-
-## Endpoint rules
-
-| Rule | Example rejected |
-|---|---|
-| scheme `https`, `wss`; `http`/`ws` only for exactly `localhost`, `127.0.0.1`, `[::1]` | `http://node.example.com`, `http://app.localhost` |
-| no credentials in the URL | `https://user:pass@node.example.com` |
-| host = ASCII DNS name / IPv4 / `[IPv6]`; labels 1–63 chars, no leading/trailing `-` | `https://node_x.example.com`, `https://-a.example.com` |
-| port 1..65535 (default 443 / 80) | `https://node.example.com:0` |
-| ≤ 2048 chars, no whitespace | `https://node.example.com/a b` |
-
-Normalisation: scheme and host lower-cased, default port removed, path/query kept as given.
-The path/query may contain API keys — the SDK never logs it and events carry only the origin
-(`https://host:port`).
-
-## `fiaisdk_network_status` (24 bytes, all platforms)
-
-| Offset | Field | Meaning |
-|---|---|---|
-| 0 | `uint32_t struct_size` | set by caller (`FIAISDK_NETWORK_STATUS_INIT`) |
-| 4 | `int32_t state` | `FIAISDK_NETWORK_STATE_DISCONNECTED` / `_CONNECTED` |
-| 8 | `int64_t connected_at_unix_ms` | 0 when disconnected |
-| 16 | `uint32_t latency_ms` | 0 when disconnected |
-| 20 | `uint32_t reserved0` | always 0 |
-
-## C
+Use an already listening endpoint for these examples.
 
 ```c
-fiaisdk_status s = fiaisdk_network_connect(sdk, "https://node.example.com/rpc", 5000);
-if (s == FIAISDK_STATUS_UNAVAILABLE) { /* retry later */ }
+#include <fiaisdk/fiaisdk.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-fiaisdk_network_status st = FIAISDK_NETWORK_STATUS_INIT;
-fiaisdk_network_get_status(sdk, &st);
+int main(void) {
+    const fiaisdk_sdk_config config = FIAISDK_SDK_CONFIG_INIT;
+    fiaisdk_sdk *sdk = NULL;
+    if (fiaisdk_sdk_create(&config, &sdk) != FIAISDK_STATUS_OK) {
+        return 1;
+    }
 
-size_t size = 0;
-fiaisdk_network_get_endpoint(sdk, NULL, &size);   /* BUFFER_TOO_SMALL, size = needed */
-char *url = malloc(size);
-fiaisdk_network_get_endpoint(sdk, url, &size);
+    fiaisdk_status result = fiaisdk_network_connect(sdk, "tcp://127.0.0.1:9545", 5000);
+    if (result == FIAISDK_STATUS_OK) {
+        fiaisdk_network_status status = FIAISDK_NETWORK_STATUS_INIT;
+        result = fiaisdk_network_get_status(sdk, &status);
+        if (result == FIAISDK_STATUS_OK && status.state == FIAISDK_NETWORK_STATE_CONNECTED) {
+            size_t size = 0;
+            if (fiaisdk_network_get_endpoint(sdk, NULL, &size) == FIAISDK_STATUS_BUFFER_TOO_SMALL) {
+                char *endpoint = malloc(size);
+                if (endpoint != NULL) {
+                    if (fiaisdk_network_get_endpoint(sdk, endpoint, &size) == FIAISDK_STATUS_OK) {
+                        puts(endpoint);
+                    }
+                    free(endpoint);
+                }
+            }
+        }
+        fiaisdk_network_disconnect(sdk);
+    }
+    fiaisdk_sdk_destroy(sdk);
+    return result == FIAISDK_STATUS_OK ? 0 : 1;
+}
 ```
-
-## C++
 
 ```cpp
 fiaisdk::Sdk sdk;
-fiaisdk::Network network(sdk);          // must not outlive sdk
-network.connect("wss://node.example.com/ws", std::chrono::seconds(3));  // throws fiaisdk::Error
-auto status = network.status();          // state, latency, connectedAt
-std::string url = network.endpoint();
+fiaisdk::Network network(sdk);
+network.connect("tcp://127.0.0.1:9545", std::chrono::seconds(5));
+const auto status = network.status();
+network.disconnect();
 ```
 
-## Events (inside the SDK)
+Run the C or C++ example executable with the TCP URL as its first argument.
+Without an endpoint, the examples exercise only the offline SDK operations.
 
-| Event | `name()` | Data |
-|---|---|---|
-| `network::NetworkConnected` | `network.connected` | sequence, origin, latency |
-| `network::NetworkDisconnected` | `network.disconnected` | sequence, origin, reason (`Requested`, `SwitchingEndpoint`, `Shutdown`) |
+## Internal events
 
-Events are published after the state changed, outside locks, so subscribers on different
-threads may see them out of order: `sequence()` grows with every change — ignore an event whose
-sequence is lower than the last one handled, or re-read the status.
-
-Other modules subscribe with `core::subscribeTo<network::NetworkConnected>(context.eventBus(), ...)`.
+`network.connected` reports the sequence, origin and connection time.
+`network.disconnected` reports the sequence, origin and reason (requested, endpoint switch
+peer closure or shutdown). Events publish after state commits and outside session locks. Events from
+different threads can arrive out of order. Consumers can use the sequence to discard stale
+events or read the current status again.

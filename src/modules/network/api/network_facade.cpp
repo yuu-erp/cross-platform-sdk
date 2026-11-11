@@ -4,8 +4,8 @@
 
 namespace fiaisdk::network {
 
-NetworkFacade::NetworkFacade(INodeProbe &probe, const core::ModuleContext &context)
-    : connectToNode_(probe, context.clock(), context.eventBus(), session_),
+NetworkFacade::NetworkFacade(INodeConnector &connector, const core::ModuleContext &context)
+    : connectToNode_(connector, context.clock(), context.eventBus(), session_),
       disconnectFromNode_(context.clock(), context.eventBus(), session_),
       log_(context.logger(), "network") {}
 
@@ -30,6 +30,7 @@ core::Result<void> NetworkFacade::disconnect(NetworkDisconnected::Reason reason)
 }
 
 std::optional<ConnectionInfo> NetworkFacade::status() const {
+    disconnectFromNode_.refreshPeer();
     return session_.current();
 }
 

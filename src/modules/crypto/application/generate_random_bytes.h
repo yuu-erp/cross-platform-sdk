@@ -16,7 +16,7 @@ class GenerateRandomBytes {
             return core::Error::invalidArgument("random byte count must be between 1 and 65536");
         }
         core::SecureBytes output(size);
-        auto result = provider_->privateRandom(output.mutableView());
+        const auto result = provider_->privateRandom(output.mutableView());
         if (!result) {
             return result.error();
         }

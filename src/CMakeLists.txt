@@ -2,9 +2,12 @@
 #   fiaisdk_core_domain          STATIC  Result/Error, StrongType, DomainEvent, SecureBytes
 #   fiaisdk_core_application     STATIC  ports (IClock, ILogger, IEventBus), Module, lifecycle
 #   fiaisdk_core_infrastructure  STATIC  default adapters (SystemClock, NullLogger, event bus)
-#   fiaisdk_<module>             STATIC  one per module (later split per layer)
+#   fiaisdk_crypto_infra         STATIC  crypto adapters (links fiaisdk_crypto_core)
+#   fiaisdk_network_infra        STATIC  network adapters (links fiaisdk_network_core)
+#   fiaisdk_wallet               STATIC  offline wallet
+#   fiaisdk_smc                  STATIC  SMC module
 # Public target:
-#   fiaisdk                      SHARED  C ABI (bindings) + composition root, links everything.
+#   fiaisdk                      SHARED  C ABI (bindings) + bootstrap/composition_root.cpp, links everything.
 # Include root for all internal code is src/ ("core/domain/result.h", "modules/wallet/...").
 
 add_subdirectory(core)

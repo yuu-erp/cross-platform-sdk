@@ -6,8 +6,9 @@ class GeneratePrivateKey {
   public:
     explicit GeneratePrivateKey(const ICryptoProvider &provider) noexcept : provider_(&provider) {}
     [[nodiscard]] core::Result<core::SecureBytes> execute(KeyScheme scheme) const {
-        if (!validScheme(scheme))
+        if (!validScheme(scheme)) {
             return core::Error::invalidArgument("unsupported key scheme");
+        }
         return provider_->generatePrivateKey(scheme);
     }
 

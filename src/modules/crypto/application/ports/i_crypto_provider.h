@@ -16,6 +16,11 @@ using Sha256Digest = std::array<std::uint8_t, 32>;
 /// Primitive provider boundary. Implementations must be thread-safe; errors contain no secrets.
 class ICryptoProvider {
   public:
+    ICryptoProvider() = default;
+    ICryptoProvider(const ICryptoProvider &) = delete;
+    ICryptoProvider &operator=(const ICryptoProvider &) = delete;
+    ICryptoProvider(ICryptoProvider &&) = delete;
+    ICryptoProvider &operator=(ICryptoProvider &&) = delete;
     virtual ~ICryptoProvider() = default;
     [[nodiscard]] virtual core::Result<Sha256Digest>
     sha256(std::span<const std::uint8_t> input) const = 0;

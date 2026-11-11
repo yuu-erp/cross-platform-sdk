@@ -32,7 +32,7 @@ if(MSVC)
 endif()
 add_test(NAME fiaisdk_abi_test COMMAND fiaisdk_abi_test)
 
-add_executable(fiaisdk_network_abi_test abi/network_abi_test.c)
+add_executable(fiaisdk_network_abi_test abi/network_abi_test.c support/network/loopback_listener.c)
 target_include_directories(fiaisdk_network_abi_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 target_link_libraries(fiaisdk_network_abi_test PRIVATE fiaisdk_compiler_options FiaiSDK::fiaisdk)
 set_target_properties(fiaisdk_network_abi_test PROPERTIES
@@ -44,8 +44,13 @@ add_test(NAME fiaisdk_network_abi_test COMMAND fiaisdk_network_abi_test)
 
 # --- Header-only C++ wrapper, as a consumer uses it ---------------------------------------------
 fiaisdk_add_gtest(fiaisdk_cpp_wrapper_tests
-    SOURCES cpp/sdk_wrapper_test.cpp cpp/network_wrapper_test.cpp cpp/crypto_wrapper_test.cpp cpp/wallet_wrapper_test.cpp
+    SOURCES cpp/sdk_wrapper_test.cpp cpp/network_wrapper_test.cpp cpp/crypto_wrapper_test.cpp cpp/wallet_wrapper_test.cpp support/network/loopback_listener.c
     LIBS FiaiSDK::fiaisdk)
+target_include_directories(fiaisdk_cpp_wrapper_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
+if(WIN32)
+    target_link_libraries(fiaisdk_network_abi_test PRIVATE ws2_32)
+    target_link_libraries(fiaisdk_cpp_wrapper_tests PRIVATE ws2_32)
+endif()
 set_target_properties(fiaisdk_cpp_wrapper_tests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 
 # --- Internal unit tests: src/core ---------------------------------------------------------------
@@ -74,6 +79,7 @@ fiaisdk_add_gtest(fiaisdk_network_tests
         unit/network/application/connect_to_node_test.cpp
         unit/network/application/disconnect_from_node_test.cpp
         unit/network/infrastructure/simulated_node_probe_test.cpp
+        ${PROJECT_SOURCE_DIR}/src/modules/network/infrastructure/simulated_node_probe.cpp
         unit/network/api/network_module_test.cpp
     LIBS fiaisdk_network_infra fiaisdk_core_infrastructure)
 
@@ -103,9 +109,9 @@ endif()
 if(FIAISDK_BUILD_EXAMPLES)
     add_test(NAME fiaisdk_example_c_smoke COMMAND fiaisdk_example_c)
     add_test(NAME fiaisdk_example_cpp_smoke COMMAND fiaisdk_example_cpp)
-    # Unreachable node must make the examples exit with an error.
-    add_test(NAME fiaisdk_example_c_unreachable COMMAND fiaisdk_example_c https://down.invalid)
-    set_tests_properties(fiaisdk_example_c_unreachable PROPERTIES WILL_FAIL TRUE)
+    # An invalid endpoint must make the example exit with an error.
+    add_test(NAME fiaisdk_example_c_invalid_endpoint COMMAND fiaisdk_example_c tcp://127.0.0.1)
+    set_tests_properties(fiaisdk_example_c_invalid_endpoint PROPERTIES WILL_FAIL TRUE)
 endif()
 
 # Crypto provider boundary and C99 surface.
@@ -121,7 +127,7 @@ add_test(NAME fiaisdk_crypto_abi_test COMMAND fiaisdk_crypto_abi_test)
 
 fiaisdk_add_gtest(fiaisdk_wallet_tests
     SOURCES unit/wallet/offline_wallet_test.cpp
-    LIBS fiaisdk_wallet fiaisdk_crypto_infra FiaiSDK::fiaisdk)
+    LIBS fiaisdk_wallet fiaisdk_crypto_infra FiaiSDK::fiaisdk fiaisdk_core_infrastructure)
 add_executable(fiaisdk_wallet_abi_test abi/wallet_abi_test.c)
 target_include_directories(fiaisdk_wallet_abi_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/support)
 target_link_libraries(fiaisdk_wallet_abi_test PRIVATE fiaisdk_compiler_options FiaiSDK::fiaisdk)

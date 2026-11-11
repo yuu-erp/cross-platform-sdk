@@ -17,6 +17,18 @@ The authoritative rules for agents and reviewers are in `.claude/rules/c-abi.md`
   (see `readConfig` in `src/bindings/c_api/sdk_c_api.cpp`); reuse that pattern for new structs.
 - Pre-1.0: SONAME is `libfiaisdk.so.0.<minor>`; any minor bump may break ABI. From 1.0: `SOVERSION = MAJOR`.
 
+## Data conventions
+
+[ADR-0009](../adr/0009-public-api-data-contract.md) defines the public data contract.
+
+- Binary values use `uint8_t` buffers with byte counts. Hex and Base64 are presentation formats.
+- 256-bit values use 32 unsigned big-endian bytes.
+- Instants use `int64_t` Unix milliseconds and durations use `uint32_t` milliseconds.
+- Booleans use `uint8_t` with values 0 and 1.
+- Lists use a two-call element count protocol or an SDK-owned result handle.
+- Errors use status codes or typed outputs. JSON and free-text error payloads are excluded.
+- Secrets use byte buffers or opaque handles.
+
 ## Open questions (decide by ADR before the first external release)
 
 - Windows DLL name carries no ABI version pre-1.0 (`fiaisdk.dll` for every 0.x). Options:

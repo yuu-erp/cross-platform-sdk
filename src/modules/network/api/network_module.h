@@ -2,19 +2,19 @@
 
 #include "core/application/module.h"
 #include "modules/network/api/network_facade.h"
-#include "modules/network/application/ports/i_node_probe.h"
+#include "modules/network/application/ports/i_node_connector.h"
 
 #include <memory>
 #include <string_view>
 
 namespace fiaisdk::network {
 
-/// Lifecycle of the network module. The probe adapter is injected by the composition root.
+/// Lifecycle of the network module. The connector adapter is injected by the composition root.
 class NetworkModule final : public core::Module {
   public:
     static constexpr std::string_view kName = "network";
 
-    explicit NetworkModule(std::unique_ptr<INodeProbe> probe);
+    explicit NetworkModule(std::unique_ptr<INodeConnector> connector);
 
     [[nodiscard]] std::string_view name() const noexcept override {
         return kName;
@@ -29,7 +29,7 @@ class NetworkModule final : public core::Module {
     }
 
   private:
-    std::unique_ptr<INodeProbe> probe_;
+    std::unique_ptr<INodeConnector> connector_;
     std::unique_ptr<NetworkFacade> facade_;
 };
 

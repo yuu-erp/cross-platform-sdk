@@ -1,25 +1,18 @@
 # network module
 
-Status: **demo vertical slice** — real layering and C ABI, simulated transport.
+The default adapter opens a TCP connection to a numeric IPv4 or IPv6 address and keeps the
+socket until disconnect, replacement or SDK shutdown. Meta-Node initialization and an
+alternate RPC adapter are future steps. The TCP adapter requires a numeric host and performs no
+DNS resolution. Read status through the typed `fiaisdk_network_get_status` C API.
 
-- Responsibility: manage the SDK's connection to one Meta-Node node endpoint (connect,
-  disconnect, status) and announce changes to other modules through events.
-- Depends on: core only. Other modules depend on it (via `api/` and its events).
-- Thread-safety: all facade operations are thread-safe; connect/disconnect are serialised.
+- Domain parses and normalizes endpoint URLs.
+- Application owns the connector port, session state, operation deadline and lifecycle events.
+- Infrastructure implements the TCP connector. Native socket code lives under `src/platform`.
+- The API facade exposes the use cases. The composition root selects the concrete connector.
 
-| Layer | Files | Purpose |
-|---|---|---|
-| domain | `endpoint.*` | `Endpoint` value object: URL parsing, TLS policy, no credentials |
-| | `connection_info.h` | current connection facts |
-| | `network_events.h` | `NetworkConnected`, `NetworkDisconnected` (origin only, no path) |
-| application | `ports/i_node_probe.h` | port: "does this node answer within timeout?" |
-| | `network_session.h` | thread-safe current-connection state + change sequence numbers |
-| | `connect_to_node.*`, `disconnect_from_node.*` | use cases |
-| infrastructure | `simulated_node_probe.*` | **DEMO** probe, no I/O (`*.invalid` = unreachable) |
-| api | `network_facade.*`, `network_module.*` | entry point for bindings + lifecycle |
+A connector returns an owning connection object plus connection time. The application stores
+it with the metadata only after opening succeeds. An alternate RPC implementation can own a
+logical session through the same port. Status reads use a separate lock from the operation
+gate. Tests inject fake connectors or use local TCP listeners.
 
-Public C API: `include/fiaisdk/network.h`; C++: `include/fiaisdk/cpp/network.hpp`.
-
-Replacing the demo transport: implement `INodeProbe` in `infrastructure/` with the HTTP/WebSocket
-library chosen by ADR, then swap `SimulatedNodeProbe` in `src/bootstrap/composition_root.cpp`.
-Nothing in domain/application/api/bindings changes.
+Public contracts and examples are in [the network API guide](../../../docs/api/network.md).

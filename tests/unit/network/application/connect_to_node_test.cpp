@@ -37,9 +37,9 @@ class ConnectToNodeTest : public ::testing::Test {
     test::FakeClock clock_{core::Timestamp(std::chrono::seconds(1'700'000'000))};
     test::RecordingLogger logger_;
     core::InProcessEventBus bus_{logger_};
-    test::FakeNodeProbe probe_;
+    test::FakeNodeProbe connector_;
     NetworkSession session_;
-    ConnectToNode connect_{probe_, clock_, bus_, session_};
+    ConnectToNode connect_{connector_, clock_, bus_, session_};
     std::vector<std::string> events_;
     std::vector<std::uint64_t> sequences_;
     core::Subscription connected_;
@@ -47,7 +47,7 @@ class ConnectToNodeTest : public ::testing::Test {
 };
 
 TEST_F(ConnectToNodeTest, ConnectsStoresStateAndPublishesEvent) {
-    probe_.willSucceed(42ms);
+    connector_.willSucceed(42ms);
     const auto result = connect_.execute({"https://node.example.com/rpc", 3s});
 
     ASSERT_TRUE(result);
@@ -55,8 +55,8 @@ TEST_F(ConnectToNodeTest, ConnectsStoresStateAndPublishesEvent) {
     EXPECT_EQ(result.value().connectedAt, clock_.now());
     ASSERT_TRUE(session_.current());
     EXPECT_EQ(session_.current()->endpoint.url(), "https://node.example.com/rpc");
-    ASSERT_EQ(probe_.calls().size(), 1U);
-    EXPECT_EQ(probe_.calls()[0].timeout, 3s);
+    ASSERT_EQ(connector_.calls().size(), 1U);
+    EXPECT_EQ(connector_.calls()[0].timeout, 3s);
     EXPECT_THAT(events_, ElementsAre("connected https://node.example.com"));
 }
 
@@ -64,7 +64,7 @@ TEST_F(ConnectToNodeTest, InvalidUrlFailsWithoutProbing) {
     const auto result = connect_.execute({"http://node.example.com", 1s});
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, core::ErrorCode::InvalidArgument);
-    EXPECT_THAT(probe_.calls(), IsEmpty());
+    EXPECT_THAT(connector_.calls(), IsEmpty());
     EXPECT_FALSE(session_.current());
     EXPECT_THAT(events_, IsEmpty());
 }
@@ -76,7 +76,7 @@ TEST_F(ConnectToNodeTest, TimeoutOutsideRangeIsRejected) {
 }
 
 TEST_F(ConnectToNodeTest, UnreachableNodeReturnsUnavailableAndStaysDisconnected) {
-    probe_.willFail(core::Error::unavailable("down"));
+    connector_.willFail(core::Error::unavailable("down"));
     const auto result = connect_.execute({"https://node.example.com", 1s});
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, core::ErrorCode::Unavailable);
@@ -89,7 +89,7 @@ TEST_F(ConnectToNodeTest, ReconnectingToSameEndpointIsANoOp) {
     clock_.advance(10s);
     const auto again = connect_.execute({"HTTPS://NODE.example.com:443", 1s});
     ASSERT_TRUE(again);
-    EXPECT_EQ(probe_.calls().size(), 1U);               // not probed again
+    EXPECT_EQ(connector_.calls().size(), 1U);           // not probed again
     EXPECT_NE(again.value().connectedAt, clock_.now()); // original connection kept
     EXPECT_EQ(events_.size(), 1U);
 }
@@ -121,12 +121,12 @@ TEST_F(ConnectToNodeTest, WaitForAConcurrentOperationCountsAgainstTheTimeout) {
     EXPECT_EQ(result.error().code, core::ErrorCode::Unavailable);
     EXPECT_GE(waited, 40ms);
     EXPECT_LT(waited, 2s); // bounded, not forever
-    EXPECT_TRUE(probe_.calls().empty());
+    EXPECT_TRUE(connector_.calls().empty());
 }
 
 TEST_F(ConnectToNodeTest, FailedSwitchKeepsThePreviousConnection) {
     ASSERT_TRUE(connect_.execute({"https://a.example.com", 1s}));
-    probe_.willFail(core::Error::unavailable("down"));
+    connector_.willFail(core::Error::unavailable("down"));
     EXPECT_FALSE(connect_.execute({"https://b.example.com", 1s}));
     EXPECT_EQ(session_.current()->endpoint.host(), "a.example.com");
     EXPECT_THAT(events_, ElementsAre("connected https://a.example.com"));

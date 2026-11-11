@@ -4,13 +4,14 @@
 
 namespace fiaisdk::network {
 
-NetworkModule::NetworkModule(std::unique_ptr<INodeProbe> probe) : probe_(std::move(probe)) {}
+NetworkModule::NetworkModule(std::unique_ptr<INodeConnector> connector)
+    : connector_(std::move(connector)) {}
 
 core::Result<void> NetworkModule::initialize(const core::ModuleContext &context) {
-    if (!probe_) {
-        return core::Error::invalidArgument("network module needs a node probe");
+    if (!connector_) {
+        return core::Error::invalidArgument("network module needs a node connector");
     }
-    facade_ = std::make_unique<NetworkFacade>(*probe_, context);
+    facade_ = std::make_unique<NetworkFacade>(*connector_, context);
     return {};
 }
 

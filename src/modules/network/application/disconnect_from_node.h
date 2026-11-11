@@ -21,7 +21,12 @@ class DisconnectFromNode {
     [[nodiscard]] core::Result<void>
     execute(NetworkDisconnected::Reason reason = NetworkDisconnected::Reason::Requested) const;
 
+    /// Reconcile a known peer close without waiting for another operation.
+    void refreshPeer() const;
+
   private:
+    void close(NetworkDisconnected::Reason reason, bool peerOnly) const;
+
     core::IClock *clock_;
     core::IEventBus *events_;
     NetworkSession *session_;

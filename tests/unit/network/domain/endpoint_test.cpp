@@ -73,6 +73,19 @@ TEST(Endpoint, AcceptsIpv6Literals) {
     EXPECT_EQ(e.port(), 8443);
 }
 
+TEST(Endpoint, TcpRequiresExplicitPortAndNoTarget) {
+    const auto ipv4 = Endpoint::parse("TCP://127.0.0.1:80");
+    ASSERT_TRUE(ipv4);
+    EXPECT_EQ(ipv4.value().url(), "tcp://127.0.0.1:80");
+    const auto ipv6 = Endpoint::parse("tcp://[::1]:9545");
+    ASSERT_TRUE(ipv6);
+    EXPECT_EQ(ipv6.value().url(), "tcp://[::1]:9545");
+    EXPECT_FALSE(Endpoint::parse("tcp://127.0.0.1"));
+    EXPECT_FALSE(Endpoint::parse("tcp://127.0.0.1:9545/"));
+    EXPECT_FALSE(Endpoint::parse("tcp://127.0.0.1:9545?x"));
+    EXPECT_FALSE(Endpoint::parse("tcp://127.0.0.1:9545#x"));
+}
+
 TEST(Endpoint, RejectsMalformedUrls) {
     expectInvalid("");
     expectInvalid("node.example.com");                   // no scheme

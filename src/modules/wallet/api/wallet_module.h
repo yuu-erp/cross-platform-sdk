@@ -1,12 +1,13 @@
 #pragma once
 #include "core/application/module.h"
+#include "modules/crypto/api/crypto_module.h"
 #include "modules/wallet/api/wallet_facade.h"
 #include <memory>
 namespace fiaisdk::wallet {
 class WalletModule final : public core::Module {
   public:
     static constexpr std::string_view kName = "wallet";
-    explicit WalletModule(const crypto::CryptoFacade &crypto) noexcept : crypto_(&crypto) {}
+    explicit WalletModule(const crypto::CryptoModule &crypto) noexcept : crypto_(&crypto) {}
     [[nodiscard]] std::string_view name() const noexcept override {
         return kName;
     }
@@ -17,7 +18,7 @@ class WalletModule final : public core::Module {
     }
 
   private:
-    const crypto::CryptoFacade *crypto_;
+    const crypto::CryptoModule *crypto_;
     std::unique_ptr<WalletFacade> facade_;
 };
 } // namespace fiaisdk::wallet

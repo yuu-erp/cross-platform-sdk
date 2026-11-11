@@ -23,6 +23,15 @@ Headers (`include/fiaisdk/*.h`)
 - Never change the value of an existing status code or the signature of an existing function.
   Deprecate with `FIAISDK_DEPRECATED` and add `_v2`.
 
+Data conventions ([ADR-0009](../../docs/adr/0009-public-api-data-contract.md))
+- Binary data uses `uint8_t` buffers and byte lengths. Hex and Base64 are presentation formats.
+- 256-bit values use exactly 32 unsigned big-endian bytes.
+- Instants use `int64_t` Unix milliseconds and durations use `uint32_t` milliseconds.
+- Booleans use `uint8_t` with values 0 and 1.
+- Lists use a two-call element count protocol or an SDK-owned result handle.
+- Errors use typed status codes or typed outputs. JSON and free-text error payloads are excluded.
+- Secrets use byte buffers or opaque handles.
+
 Implementation (`src/bindings/c_api/*.cpp`)
 - Every exported function body: validate args → `try { ... } catch (...) { return map(...); }`.
   No exception, `abort`, or `assert` reaches the caller on bad input.

@@ -49,6 +49,7 @@ class NetworkDisconnected final : public core::DomainEvent {
     enum class Reason : std::uint8_t {
         Requested,         ///< the host application asked to disconnect
         SwitchingEndpoint, ///< replaced by a connection to another endpoint
+        PeerClosed,        ///< the transport detected that the peer closed the connection
         Shutdown,          ///< the SDK instance is being destroyed
     };
 

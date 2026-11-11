@@ -64,6 +64,23 @@ void operator delete[](void *memory, std::size_t) noexcept {
     std::free(memory);
 }
 
+void *operator new(std::size_t size, const std::nothrow_t &) noexcept {
+    try {
+        return ::operator new(size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+void *operator new[](std::size_t size, const std::nothrow_t &tag) noexcept {
+    return ::operator new(size, tag);
+}
+void operator delete(void *memory, const std::nothrow_t &) noexcept {
+    std::free(memory);
+}
+void operator delete[](void *memory, const std::nothrow_t &) noexcept {
+    std::free(memory);
+}
+
 namespace fiaisdk::core {
 namespace {
 

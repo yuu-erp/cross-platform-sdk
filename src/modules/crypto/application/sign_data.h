@@ -8,9 +8,10 @@ class SignData {
     [[nodiscard]] core::Result<std::vector<std::uint8_t>>
     execute(KeyScheme scheme, std::span<const std::uint8_t> secret,
             std::span<const std::uint8_t> data) const {
-        if (!validScheme(scheme) || secret.size() != 32 || !validSigningData(scheme, data.size()))
+        if (!validScheme(scheme) || secret.size() != 32 || !validSigningData(scheme, data.size())) {
             return core::Error::invalidArgument(
                 "invalid signing scheme, key length or digest length");
+        }
         return provider_->sign(scheme, secret, data);
     }
 

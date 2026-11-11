@@ -113,7 +113,7 @@ TEST(CryptoModule, LifecycleAndMissingProvider) {
     CryptoModule invalid(nullptr);
     EXPECT_FALSE(invalid.initialize(context));
     CryptoModule module(std::make_unique<LibraryCryptoProvider>());
-    EXPECT_NE(module.facade(), nullptr); // stateless facade available for dependency wiring
+    EXPECT_EQ(module.facade(), nullptr);
     ASSERT_TRUE(module.initialize(context));
     ASSERT_NE(module.facade(), nullptr);
     EXPECT_TRUE(module.facade()->sha256({}));

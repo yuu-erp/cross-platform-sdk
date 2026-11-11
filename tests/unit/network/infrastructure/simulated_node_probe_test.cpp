@@ -15,15 +15,15 @@ Endpoint endpoint(const char *url) {
 
 TEST(SimulatedNodeProbe, ReservedInvalidTldIsUnreachable) {
     SimulatedNodeProbe probe;
-    const auto result = probe.probe(endpoint("https://down.invalid"), 5s);
+    const auto result = probe.open(endpoint("https://down.invalid"), 5s);
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, core::ErrorCode::Unavailable);
 }
 
 TEST(SimulatedNodeProbe, LatencyIsDeterministicAndInRange) {
     SimulatedNodeProbe probe;
-    const auto first = probe.probe(endpoint("https://node.example.com"), 5s);
-    const auto second = probe.probe(endpoint("https://node.example.com/other"), 5s);
+    const auto first = probe.open(endpoint("https://node.example.com"), 5s);
+    const auto second = probe.open(endpoint("https://node.example.com/other"), 5s);
     ASSERT_TRUE(first);
     ASSERT_TRUE(second);
     EXPECT_EQ(first.value().latency, second.value().latency); // depends on host only
@@ -34,8 +34,8 @@ TEST(SimulatedNodeProbe, LatencyIsDeterministicAndInRange) {
 TEST(SimulatedNodeProbe, LatencyAboveTimeoutIsUnavailable) {
     SimulatedNodeProbe probe;
     const auto latency = SimulatedNodeProbe::simulatedLatency("node.example.com");
-    EXPECT_TRUE(probe.probe(endpoint("https://node.example.com"), latency));
-    const auto tooShort = probe.probe(endpoint("https://node.example.com"), latency - 1ms);
+    EXPECT_TRUE(probe.open(endpoint("https://node.example.com"), latency));
+    const auto tooShort = probe.open(endpoint("https://node.example.com"), latency - 1ms);
     ASSERT_FALSE(tooShort);
     EXPECT_EQ(tooShort.error().code, core::ErrorCode::Unavailable);
 }

@@ -4,8 +4,8 @@ Modular, cross-platform (Windows / macOS / Linux) C++20 SDK for the Meta-Node ec
 One shared library (`fiaisdk.dll`, `libfiaisdk.dylib`, `libfiaisdk.so`) exposing a **stable C ABI**
 and a **header-only C++ wrapper** on top of it.
 
-> Status: pre-1.0. `network` is a complete **demo** vertical slice (connect / disconnect / status,
-> simulated transport). `crypto` provides hash/random/BLS/secp256k1 operations;
+> Status: pre-1.0. `network` opens and owns a real TCP connection. Meta-Node session initialization
+> and an alternate RPC adapter are pending. `crypto` provides hash/random/BLS/secp256k1 operations;
 > `wallet` provides an in-memory offline dual-key wallet; `smc` remains a placeholder.
 
 ## Design in one paragraph

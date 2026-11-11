@@ -48,6 +48,9 @@ std::optional<Endpoint::Scheme> parseScheme(std::string_view text) {
     if (scheme == "ws") {
         return Endpoint::Scheme::Ws;
     }
+    if (scheme == "tcp") {
+        return Endpoint::Scheme::Tcp;
+    }
     return std::nullopt;
 }
 
@@ -110,6 +113,8 @@ std::string_view toString(Endpoint::Scheme scheme) noexcept {
         return "http";
     case Endpoint::Scheme::Ws:
         return "ws";
+    case Endpoint::Scheme::Tcp:
+        return "tcp";
     }
     return "https";
 }
@@ -202,11 +207,11 @@ core::Result<Endpoint> Endpoint::parse(std::string_view url) {
     }
     const auto schemeEnd = url.find("://");
     if (schemeEnd == std::string_view::npos) {
-        return invalid("missing scheme (expected https://, wss://, http:// or ws://)");
+        return invalid("missing scheme (expected tcp://, https://, wss://, http:// or ws://)");
     }
     const auto scheme = parseScheme(url.substr(0, schemeEnd));
     if (!scheme) {
-        return invalid("unsupported scheme (expected https, wss, http or ws)");
+        return invalid("unsupported scheme (expected tcp, https, wss, http or ws)");
     }
 
     const std::string_view rest = url.substr(schemeEnd + 3);
@@ -215,6 +220,10 @@ core::Result<Endpoint> Endpoint::parse(std::string_view url) {
     if (!hostPort) {
         return hostPort.error();
     }
+    const bool tcp = *scheme == Scheme::Tcp;
+    if (tcp && (hostPort.value().port.empty() || authorityEnd != std::string_view::npos)) {
+        return invalid("TCP requires an explicit port and no path, query or fragment");
+    }
     auto port = parsePort(hostPort.value().port, defaultPort(*scheme));
     if (!port) {
         return port.error();
@@ -222,7 +231,7 @@ core::Result<Endpoint> Endpoint::parse(std::string_view url) {
 
     std::string host = lowered(hostPort.value().host);
     const bool secure = *scheme == Scheme::Https || *scheme == Scheme::Wss;
-    if (!secure && !isLoopback(host)) {
+    if (!tcp && !secure && !isLoopback(host)) {
         return invalid("plain http/ws is only allowed for localhost; use https or wss");
     }
     std::string target = authorityEnd == std::string_view::npos
@@ -239,7 +248,7 @@ std::string Endpoint::origin() const {
     std::string out(toString(scheme_));
     out += "://";
     out += host_;
-    if (port_ != defaultPort(scheme_)) {
+    if (scheme_ == Scheme::Tcp || port_ != defaultPort(scheme_)) {
         out += ':';
         out += std::to_string(port_);
     }

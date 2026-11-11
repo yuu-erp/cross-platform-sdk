@@ -2,7 +2,7 @@
 //
 //   fiaisdk_example_cpp [endpoint-url]
 //
-// NOTE: the network transport is simulated in this version (no real I/O).
+// Pass a listening TCP endpoint such as tcp://127.0.0.1:9545 to exercise the network.
 #include <fiaisdk/cpp/crypto.hpp>
 #include <fiaisdk/cpp/network.hpp>
 #include <fiaisdk/cpp/wallet.hpp>
@@ -13,7 +13,6 @@
 #include <string>
 
 int main(int argc, char **argv) {
-    const std::string url = argc > 1 ? argv[1] : "https://node.example.com/rpc";
     try {
         const fiaisdk::Sdk sdk({"cpp-example", "1.0.0"});
         std::cout << "FiaiSDK " << fiaisdk::runtimeVersion() << '\n';
@@ -34,10 +33,12 @@ int main(int argc, char **argv) {
         }
         std::cout << "Offline secp256k1 signature verified\n";
 
+        if (argc < 2) {
+            return 0;
+        }
         const fiaisdk::Network network(sdk);
-        network.connect(url, std::chrono::seconds(5));
+        network.connect(argv[1], std::chrono::seconds(5));
         const auto status = network.status();
-        // Demo only: a real app must not print/log the full URL (may contain an API key).
         std::cout << "connected: " << network.endpoint() << '\n'
                   << "latency: " << status.latency.count() << " ms\n";
         network.disconnect();

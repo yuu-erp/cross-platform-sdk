@@ -61,8 +61,7 @@ typedef struct fiaisdk_sdk_config {
 
 /** Zero-initialised config with struct_size set: `fiaisdk_sdk_config c = FIAISDK_SDK_CONFIG_INIT;`
  */
-#define FIAISDK_SDK_CONFIG_INIT                                                                    \
-    { FIAISDK_U32_(sizeof(fiaisdk_sdk_config)), NULL, NULL }
+#define FIAISDK_SDK_CONFIG_INIT {FIAISDK_U32_(sizeof(fiaisdk_sdk_config)), NULL, NULL}
 
 #ifdef __cplusplus
 }

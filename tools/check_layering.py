@@ -85,6 +85,11 @@ OWN_ALLOWED = {
 
 def check_edge(src: Unit, dst: Unit) -> str | None:
     composition_root = src.kind == "bootstrap" and src.layer == "root"
+    if src.kind in ("platform", "platform_os"):
+        if dst.kind in ("module", "bindings", "bootstrap"):
+            return "platform must not depend on modules, bindings or bootstrap"
+        if dst.kind == "core" and dst.layer != "domain":
+            return "platform may only depend on core/domain"
     if dst.kind == "bootstrap" and src.kind not in ("bootstrap", "bindings"):
         return "core, modules and platform must not depend on bootstrap"
     if dst.kind == "platform_os" and src.kind != "platform_os" and not composition_root:

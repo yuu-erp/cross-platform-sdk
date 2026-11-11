@@ -12,12 +12,11 @@ extern "C" {
 /*
  * Network module: the SDK's connection to one node.
  *
- * DEMO STATUS: the transport is simulated (no network I/O) until the HTTP/WebSocket library
- * ADR lands. Hosts ending in ".invalid" behave as unreachable; any other valid host connects
- * with a deterministic latency of 5..49 ms. The API below is meant to stay stable.
- *
- * Endpoint rules: https:// or wss:// (http:// and ws:// only for exactly localhost, 127.0.0.1
- * or [::1]); no "user:password@" in the URL; ASCII host; port 1..65535; at most 2048 characters.
+ * The default TCP adapter accepts tcp://IPv4:port and tcp://[IPv6]:port. The port must be
+ * explicit (1..65535). Hostnames, credentials, paths, queries and fragments are rejected.
+ * CONNECTED currently means the TCP handshake completed and the SDK holds the socket.
+ * Status reads check for a peer close without consuming incoming data.
+ * The transport does not perform Meta-Node initialization.
  *
  * Common to every function below:
  * - must not run concurrently with fiaisdk_sdk_destroy on the same instance;
@@ -39,7 +38,7 @@ typedef struct fiaisdk_network_status {
     int32_t state;
     /** When the connection was established, milliseconds since 1970-01-01 UTC; 0 if none. */
     int64_t connected_at_unix_ms;
-    /** Round-trip time measured when connecting; 0 if disconnected. */
+    /** Time spent establishing the connection; 0 if disconnected. */
     uint32_t latency_ms;
     /** Always 0. Keeps the layout identical on 32- and 64-bit platforms. */
     uint32_t reserved0;
@@ -48,8 +47,7 @@ typedef struct fiaisdk_network_status {
 #define FIAISDK_NETWORK_STATUS_V1_SIZE                                                             \
     FIAISDK_U32_(offsetof(fiaisdk_network_status, reserved0) + sizeof(uint32_t))
 
-#define FIAISDK_NETWORK_STATUS_INIT                                                                \
-    { FIAISDK_U32_(sizeof(fiaisdk_network_status)), 0, 0, 0, 0 }
+#define FIAISDK_NETWORK_STATUS_INIT {FIAISDK_U32_(sizeof(fiaisdk_network_status)), 0, 0, 0, 0}
 
 /**
  * Connect to the node at `endpoint_url`, replacing the current connection if the new one

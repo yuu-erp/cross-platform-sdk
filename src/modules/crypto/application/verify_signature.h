@@ -10,8 +10,9 @@ class VerifySignature {
                                              std::span<const std::uint8_t> data,
                                              std::span<const std::uint8_t> signature) const {
         if (!validScheme(scheme) || publicKey.size() != publicKeySize(scheme) ||
-            signature.size() != signatureSize(scheme) || !validSigningData(scheme, data.size()))
+            signature.size() != signatureSize(scheme) || !validSigningData(scheme, data.size())) {
             return core::Error::invalidArgument("invalid verification scheme or input length");
+        }
         return provider_->verify(scheme, publicKey, data, signature);
     }
 

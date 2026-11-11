@@ -35,6 +35,29 @@ class BootstrapLayeringTest(unittest.TestCase):
             layering.classify(Path("src/core/infrastructure/logger.cpp")),
             layering.classify(Path("src/modules/crypto/api/crypto.h"))))
 
+    def test_platform_cannot_include_modules(self):
+        destination = layering.classify(Path("src/modules/network/application/ports/connector.h"))
+        for source in ("src/platform/tcp_socket.h", "src/platform/linux/tcp_socket.cpp"):
+            with self.subTest(source=source):
+                self.assertEqual(
+                    layering.check_edge(layering.classify(Path(source)), destination),
+                    "platform must not depend on modules, bindings or bootstrap")
+
+    def test_scanner_rejects_old_platform_include(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src/platform/tcp_socket.h"
+            destination = root / "src/modules/network/application/ports/i_node_connector.h"
+            source.parent.mkdir(parents=True)
+            destination.parent.mkdir(parents=True)
+            destination.write_text("#pragma once\n")
+            source.write_text('#include "modules/network/application/ports/i_node_connector.h"\n')
+            result = subprocess.run(
+                [sys.executable, str(Path(layering.__file__)), "--root", directory],
+                capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("platform must not depend on modules", result.stdout)
+
     def test_scanner_rejects_real_include_violation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

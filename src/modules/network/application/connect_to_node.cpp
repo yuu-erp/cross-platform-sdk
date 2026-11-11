@@ -47,14 +47,14 @@ core::Result<ConnectionInfo> ConnectToNode::execute(const ConnectInput &input) c
         if (remaining < kMinTimeout) {
             return core::Error::unavailable("timed out waiting for a concurrent operation");
         }
-        auto probed = probe_->probe(connected.endpoint, remaining);
-        if (!probed) {
-            return probed.error(); // previous connection, if any, stays in place
+        auto opened = connector_->open(connected.endpoint, remaining);
+        if (!opened) {
+            return opened.error(); // previous connection, if any, stays in place
         }
 
         // Allocate everything before committing, so a bad_alloc cannot leave the state changed
         // without the matching events.
-        connected.latency = probed.value().latency;
+        connected.latency = opened.value().latency;
         connected.connectedAt = clock_->now();
         connectedOrigin = connected.endpoint.origin();
         if (previous) {
@@ -64,11 +64,13 @@ core::Result<ConnectionInfo> ConnectToNode::execute(const ConnectInput &input) c
 
         // Commit: nothing below throws.
         if (previousOrigin) {
-            const auto sequences = session_->replace(std::move(stored));
+            const auto sequences =
+                session_->replace(std::move(stored), std::move(opened.value().connection));
             disconnectSequence = sequences.disconnectSequence;
             connectSequence = sequences.connectSequence;
         } else {
-            connectSequence = session_->set(std::move(stored));
+            connectSequence =
+                session_->set(std::move(stored), std::move(opened.value().connection));
         }
     }
 

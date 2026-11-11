@@ -28,9 +28,9 @@ class DisconnectFromNodeTest : public ::testing::Test {
     test::FakeClock clock_;
     test::RecordingLogger logger_;
     core::InProcessEventBus bus_{logger_};
-    test::FakeNodeProbe probe_;
+    test::FakeNodeProbe connector_;
     NetworkSession session_;
-    ConnectToNode connect_{probe_, clock_, bus_, session_};
+    ConnectToNode connect_{connector_, clock_, bus_, session_};
     DisconnectFromNode disconnect_{clock_, bus_, session_};
     core::Subscription subscription_;
     std::optional<NetworkDisconnected::Reason> lastReason_;

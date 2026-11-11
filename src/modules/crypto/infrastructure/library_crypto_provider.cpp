@@ -27,12 +27,25 @@ class ThreadCleanup {
     }
     ThreadCleanup(const ThreadCleanup &) = delete;
     ThreadCleanup &operator=(const ThreadCleanup &) = delete;
+    ThreadCleanup(ThreadCleanup &&) = delete;
+    ThreadCleanup &operator=(ThreadCleanup &&) = delete;
 
   private:
     OSSL_LIB_CTX *context_;
 };
 
+struct SecpContextDestroy {
+    void operator()(secp256k1_context *context) const noexcept {
+        secp256k1_context_preallocated_destroy(context);
+    }
+};
+
 template <class T> struct Wiped {
+    Wiped() = default;
+    Wiped(const Wiped &) = delete;
+    Wiped &operator=(const Wiped &) = delete;
+    Wiped(Wiped &&) = delete;
+    Wiped &operator=(Wiped &&) = delete;
     T value{};
     ~Wiped() {
         OPENSSL_cleanse(&value, sizeof(value));
@@ -59,8 +72,7 @@ struct LibraryCryptoProvider::Impl {
         std::vector<std::max_align_t>((secp256k1_context_preallocated_size(SECP256K1_CONTEXT_NONE) +
                                        sizeof(std::max_align_t) - 1) /
                                       sizeof(std::max_align_t));
-    std::unique_ptr<secp256k1_context, decltype(&secp256k1_context_preallocated_destroy)> secp{
-        nullptr, secp256k1_context_preallocated_destroy};
+    std::unique_ptr<secp256k1_context, SecpContextDestroy> secp;
 
     Impl() {
         if (!context) {
@@ -121,8 +133,9 @@ LibraryCryptoProvider::keccak256(std::span<const std::uint8_t> input) const {
     unsigned length = 0;
     if (EVP_Digest(messageData(input), input.size(), bytes.data(), &length, impl_->keccak.get(),
                    nullptr) != 1 ||
-        length != 32)
+        length != 32) {
         return core::Error::unavailable("Keccak-256 operation failed");
+    }
     Sha256Digest output{};
     std::copy_n(bytes.begin(), output.size(), output.begin());
     return output;
@@ -132,23 +145,27 @@ core::Result<core::SecureBytes> LibraryCryptoProvider::generatePrivateKey(KeySch
     core::SecureBytes secret(32);
     if (scheme == KeyScheme::Bls12381) {
         core::SecureBytes ikm(32);
-        auto random = privateRandom(ikm.mutableView());
-        if (!random)
+        const auto random = privateRandom(ikm.mutableView());
+        if (!random) {
             return random.error();
+        }
         Wiped<blst_scalar> scalar;
         blst_keygen(&scalar.value, ikm.view().data(), ikm.size(), nullptr, 0);
-        if (!blst_sk_check(&scalar.value))
+        if (!blst_sk_check(&scalar.value)) {
             return core::Error::unavailable("BLS key generation failed");
+        }
         blst_bendian_from_scalar(secret.mutableView().data(), &scalar.value);
         return secret;
     }
     if (scheme == KeyScheme::Secp256k1) {
         for (unsigned attempt = 0; attempt < 128; ++attempt) {
-            auto random = privateRandom(secret.mutableView());
-            if (!random)
+            const auto random = privateRandom(secret.mutableView());
+            if (!random) {
                 return random.error();
-            if (secp256k1_ec_seckey_verify(impl_->secp.get(), secret.view().data()) == 1)
+            }
+            if (secp256k1_ec_seckey_verify(impl_->secp.get(), secret.view().data()) == 1) {
                 return secret;
+            }
         }
         return core::Error::unavailable("secp256k1 key generation failed");
     }
@@ -158,13 +175,15 @@ core::Result<core::SecureBytes> LibraryCryptoProvider::generatePrivateKey(KeySch
 core::Result<std::vector<std::uint8_t>>
 LibraryCryptoProvider::derivePublicKey(KeyScheme scheme,
                                        std::span<const std::uint8_t> secret) const {
-    if (secret.size() != 32)
+    if (secret.size() != 32) {
         return core::Error::invalidArgument("private key must be 32 bytes");
+    }
     if (scheme == KeyScheme::Bls12381) {
         Wiped<blst_scalar> scalar;
         blst_scalar_from_bendian(&scalar.value, secret.data());
-        if (!blst_sk_check(&scalar.value))
+        if (!blst_sk_check(&scalar.value)) {
             return core::Error::invalidArgument("invalid BLS private key");
+        }
         blst_p1 point{};
         blst_sk_to_pk_in_g1(&point, &scalar.value);
         std::vector<std::uint8_t> output(48);
@@ -172,17 +191,20 @@ LibraryCryptoProvider::derivePublicKey(KeyScheme scheme,
         return output;
     }
     if (scheme == KeyScheme::Secp256k1) {
-        if (secp256k1_ec_seckey_verify(impl_->secp.get(), secret.data()) != 1)
+        if (secp256k1_ec_seckey_verify(impl_->secp.get(), secret.data()) != 1) {
             return core::Error::invalidArgument("invalid secp256k1 private key");
+        }
         secp256k1_pubkey point{};
-        if (secp256k1_ec_pubkey_create(impl_->secp.get(), &point, secret.data()) != 1)
+        if (secp256k1_ec_pubkey_create(impl_->secp.get(), &point, secret.data()) != 1) {
             return core::Error::unavailable("public key derivation failed");
+        }
         std::vector<std::uint8_t> output(65);
         std::size_t size = output.size();
         if (secp256k1_ec_pubkey_serialize(impl_->secp.get(), output.data(), &size, &point,
                                           SECP256K1_EC_UNCOMPRESSED) != 1 ||
-            size != output.size())
+            size != output.size()) {
             return core::Error::internal("public key serialization failed");
+        }
         return output;
     }
     return core::Error::invalidArgument("unsupported key scheme");
@@ -191,35 +213,44 @@ LibraryCryptoProvider::derivePublicKey(KeyScheme scheme,
 core::Result<std::vector<std::uint8_t>>
 LibraryCryptoProvider::sign(KeyScheme scheme, std::span<const std::uint8_t> secret,
                             std::span<const std::uint8_t> data) const {
-    if (secret.size() != 32)
+    if (secret.size() != 32) {
         return core::Error::invalidArgument("private key must be 32 bytes");
+    }
     if (scheme == KeyScheme::Bls12381) {
         Wiped<blst_scalar> scalar;
         blst_scalar_from_bendian(&scalar.value, secret.data());
-        if (!blst_sk_check(&scalar.value))
+        if (!blst_sk_check(&scalar.value)) {
             return core::Error::invalidArgument("invalid BLS private key");
-        blst_p2 hashed{}, signedPoint{};
+        }
+        blst_p2 hashed{};
+        blst_p2 signedPoint{};
         blst_hash_to_g2(&hashed, messageData(data), data.size(),
+                        // blst expects the bytes of the ASCII domain separation tag.
+                        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
                         reinterpret_cast<const std::uint8_t *>(kBlsDst.data()), kBlsDst.size(),
-                        nullptr, 0); // NOLINT(*-pro-type-reinterpret-cast)
+                        nullptr, 0);
         blst_sign_pk_in_g1(&signedPoint, &hashed, &scalar.value);
         std::vector<std::uint8_t> output(96);
         blst_p2_compress(output.data(), &signedPoint);
         return output;
     }
     if (scheme == KeyScheme::Secp256k1) {
-        if (data.size() != 32 || secp256k1_ec_seckey_verify(impl_->secp.get(), secret.data()) != 1)
+        if (data.size() != 32 ||
+            secp256k1_ec_seckey_verify(impl_->secp.get(), secret.data()) != 1) {
             return core::Error::invalidArgument("invalid secp256k1 key or digest length");
+        }
         secp256k1_ecdsa_recoverable_signature signature{};
         if (secp256k1_ecdsa_sign_recoverable(impl_->secp.get(), &signature, data.data(),
-                                             secret.data(), nullptr, nullptr) != 1)
+                                             secret.data(), nullptr, nullptr) != 1) {
             return core::Error::unavailable("secp256k1 signing failed");
+        }
         std::vector<std::uint8_t> output(65);
         int recovery = 0;
         if (secp256k1_ecdsa_recoverable_signature_serialize_compact(
-                impl_->secp.get(), output.data(), &recovery, &signature) != 1)
+                impl_->secp.get(), output.data(), &recovery, &signature) != 1) {
             return core::Error::internal("signature serialization failed");
-        output[64] = static_cast<std::uint8_t>(recovery);
+        }
+        output.back() = static_cast<std::uint8_t>(recovery);
         return output;
     }
     return core::Error::invalidArgument("unsupported key scheme");
@@ -230,41 +261,50 @@ core::Result<bool> LibraryCryptoProvider::verify(KeyScheme scheme,
                                                  std::span<const std::uint8_t> data,
                                                  std::span<const std::uint8_t> signature) const {
     if (scheme == KeyScheme::Bls12381) {
-        if (publicKey.size() != 48 || signature.size() != 96)
+        if (publicKey.size() != 48 || signature.size() != 96) {
             return core::Error::invalidArgument("invalid BLS public key or signature length");
+        }
         blst_p1_affine pk{};
         blst_p2_affine sig{};
         if (blst_p1_uncompress(&pk, publicKey.data()) != BLST_SUCCESS ||
             blst_p2_uncompress(&sig, signature.data()) != BLST_SUCCESS ||
             !blst_p1_affine_in_g1(&pk) || blst_p1_affine_is_inf(&pk) ||
-            !blst_p2_affine_in_g2(&sig) || blst_p2_affine_is_inf(&sig))
+            !blst_p2_affine_in_g2(&sig) || blst_p2_affine_is_inf(&sig)) {
             return false;
-        return blst_core_verify_pk_in_g1(&pk, &sig, true, messageData(data), data.size(),
-                                         reinterpret_cast<const std::uint8_t *>(kBlsDst.data()),
-                                         kBlsDst.size(), nullptr,
-                                         0) == BLST_SUCCESS; // NOLINT(*-pro-type-reinterpret-cast)
+        }
+        return blst_core_verify_pk_in_g1(
+                   &pk, &sig, true, messageData(data), data.size(),
+                   // blst expects the bytes of the ASCII domain separation tag.
+                   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+                   reinterpret_cast<const std::uint8_t *>(kBlsDst.data()), kBlsDst.size(), nullptr,
+                   0) == BLST_SUCCESS;
     }
     if (scheme == KeyScheme::Secp256k1) {
-        if (publicKey.size() != 65 || signature.size() != 65 || data.size() != 32)
+        if (publicKey.size() != 65 || signature.size() != 65 || data.size() != 32) {
             return core::Error::invalidArgument("invalid secp256k1 input length");
-        if (signature[64] > 3 || publicKey[0] != 4)
+        }
+        if (signature.back() > 3 || publicKey.front() != 4) {
             return false;
-        secp256k1_pubkey pk{}, recovered{};
+        }
+        secp256k1_pubkey pk{};
+        secp256k1_pubkey recovered{};
         secp256k1_ecdsa_recoverable_signature sig{};
         secp256k1_ecdsa_signature normal{};
         if (secp256k1_ec_pubkey_parse(impl_->secp.get(), &pk, publicKey.data(), publicKey.size()) !=
                 1 ||
             secp256k1_ecdsa_recoverable_signature_parse_compact(
-                impl_->secp.get(), &sig, signature.data(), signature[64]) != 1 ||
+                impl_->secp.get(), &sig, signature.data(), signature.back()) != 1 ||
             secp256k1_ecdsa_recoverable_signature_convert(impl_->secp.get(), &normal, &sig) != 1 ||
             secp256k1_ecdsa_verify(impl_->secp.get(), &normal, data.data(), &pk) != 1 ||
-            secp256k1_ecdsa_recover(impl_->secp.get(), &recovered, &sig, data.data()) != 1)
+            secp256k1_ecdsa_recover(impl_->secp.get(), &recovered, &sig, data.data()) != 1) {
             return false;
+        }
         std::array<std::uint8_t, 65> bytes{};
         std::size_t size = bytes.size();
         if (secp256k1_ec_pubkey_serialize(impl_->secp.get(), bytes.data(), &size, &recovered,
-                                          SECP256K1_EC_UNCOMPRESSED) != 1)
+                                          SECP256K1_EC_UNCOMPRESSED) != 1) {
             return false;
+        }
         return std::equal(bytes.begin(), bytes.end(), publicKey.begin());
     }
     return core::Error::invalidArgument("unsupported key scheme");

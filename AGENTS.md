@@ -6,8 +6,8 @@ quick reference for humans. Keep it short; details live in `docs/` and `.claude/
 ## What this is
 Modular, cross-platform (Windows/macOS/Linux) **C++20 SDK** for the Meta-Node ecosystem,
 shipped as **one shared library** exposing a **stable C ABI** plus a header-only C++ wrapper.
-Status: pre-1.0, being rebuilt. Modules wallet/smc/network are placeholders — do not assume any
-feature exists; read the code.
+Status: pre-1.0, being rebuilt. Wallet supports offline signing, network supports TCP transport, and
+SMC is a placeholder. Read the code before assuming a feature exists.
 
 ## Read before non-trivial work
 1. `docs/architecture/target-architecture.md` — layout, layer rules, gap list; `src/core/README.md` — shared building blocks
@@ -44,6 +44,7 @@ clang-tidy -p build/debug <files>          # static analysis
 
 ## Hard nos
 - Exporting C++ classes/STL types; changing layout of an existing public struct; reordering status codes.
+- JSON, hex or other encoded text as the canonical form of structured or binary data in the public C ABI (ADR-0009).
 - Custom crypto primitives; logging keys/seeds/tokens; disabling TLS/signature verification.
 - New third-party dependency without an ADR. New layer/interface without a second real use.
 - Claiming build/test success without running it. Commits/pushes unless asked.

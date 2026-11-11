@@ -100,7 +100,7 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_crypto_random_bytes(const fiaisd
             return fiaisdk::bindings::toStatus(result.error());
         }
         const auto bytes = result.value().view();
-        std::copy(bytes.begin(), bytes.end(), output);
+        std::ranges::copy(bytes, output);
         return FIAISDK_STATUS_OK;
     } catch (...) {
         return fiaisdk::bindings::statusFromCurrentException();
@@ -111,19 +111,23 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL
 fiaisdk_crypto_verify(const fiaisdk_sdk *sdk, int32_t scheme, const uint8_t *public_key,
                       size_t public_key_size, const uint8_t *data, size_t data_size,
                       const uint8_t *signature, size_t signature_size, uint8_t *out_valid) {
-    if (out_valid != nullptr)
+    if (out_valid != nullptr) {
         *out_valid = 0;
+    }
     if (sdk == nullptr || public_key == nullptr || signature == nullptr || out_valid == nullptr ||
-        (data == nullptr && data_size != 0))
+        (data == nullptr && data_size != 0)) {
         return FIAISDK_STATUS_INVALID_ARGUMENT;
-    if (sdk->apis.crypto == nullptr)
+    }
+    if (sdk->apis.crypto == nullptr) {
         return FIAISDK_STATUS_MODULE_NOT_FOUND;
+    }
     try {
         auto result = sdk->apis.crypto->verify(static_cast<fiaisdk::crypto::KeyScheme>(scheme),
                                                {public_key, public_key_size}, {data, data_size},
                                                {signature, signature_size});
-        if (!result)
+        if (!result) {
             return fiaisdk::bindings::toStatus(result.error());
+        }
         *out_valid = result.value() ? 1 : 0;
         return FIAISDK_STATUS_OK;
     } catch (...) {

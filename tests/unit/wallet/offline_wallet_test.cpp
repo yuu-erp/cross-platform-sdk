@@ -1,11 +1,16 @@
 #include "bindings/c_api/handles.h"
+#include "core/infrastructure/in_process_event_bus.h"
+#include "core/infrastructure/null_logger.h"
+#include "core/infrastructure/system_clock.h"
 #include "modules/crypto/infrastructure/library_crypto_provider.h"
 #include "modules/wallet/api/wallet_facade.h"
+#include "modules/wallet/api/wallet_module.h"
 #include "support/crypto/unavailable_crypto_provider.h"
 #include <algorithm>
 #include <array>
 #include <fiaisdk/wallet.h>
 #include <gtest/gtest.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -33,6 +38,27 @@ class OfflineWallet : public ::testing::Test {
         return key;
     }();
 };
+
+TEST(WalletModuleTest, RequiresInitializedCryptoFacade) {
+    core::SystemClock clock;
+    core::NullLogger logger;
+    core::InProcessEventBus events(logger);
+    const core::ModuleContext context(clock, logger, events);
+    crypto::CryptoModule crypto(std::make_unique<test::UnavailableCryptoProvider>());
+    WalletModule wallet(crypto);
+
+    const auto early = wallet.initialize(context);
+    ASSERT_FALSE(early);
+    EXPECT_EQ(early.error().code, core::ErrorCode::NotInitialized);
+    EXPECT_EQ(wallet.facade(), nullptr);
+
+    ASSERT_TRUE(crypto.initialize(context));
+    ASSERT_TRUE(wallet.initialize(context));
+    EXPECT_NE(wallet.facade(), nullptr);
+    wallet.shutdown();
+    EXPECT_EQ(wallet.facade(), nullptr);
+    crypto.shutdown();
+}
 
 TEST_F(OfflineWallet, ScalarOnePublicKeysAndEvmAddress) {
     auto imported = wallet_.import(one_, one_);

@@ -1,6 +1,7 @@
 /* ABI contract tests for include/fiaisdk/network.h. Compiled as C99 on purpose. */
 #include <fiaisdk/fiaisdk.h>
 
+#include "network/loopback_listener.h"
 #include "test_check.h"
 
 #include <stddef.h>
@@ -58,11 +59,17 @@ static void test_connect_validation(void) {
           FIAISDK_STATUS_INVALID_ARGUMENT);
     CHECK(fiaisdk_network_connect(sdk, "https://node.example.com", 60001) ==
           FIAISDK_STATUS_INVALID_ARGUMENT);
-    CHECK(fiaisdk_network_connect(sdk, "https://down.invalid", 1000) == FIAISDK_STATUS_UNAVAILABLE);
+    CHECK(fiaisdk_network_connect(sdk, "https://node.example.com", 1000) ==
+          FIAISDK_STATUS_INVALID_ARGUMENT);
+    CHECK(fiaisdk_network_connect(sdk, "tcp://localhost:9545", 1000) ==
+          FIAISDK_STATUS_INVALID_ARGUMENT);
+    CHECK(fiaisdk_network_connect(sdk, "tcp://127.0.0.1", 1000) == FIAISDK_STATUS_INVALID_ARGUMENT);
+    CHECK(fiaisdk_network_connect(sdk, "tcp://127.0.0.1:9545/rpc", 1000) ==
+          FIAISDK_STATUS_INVALID_ARGUMENT);
     fiaisdk_sdk_destroy(sdk);
 }
 
-static void test_status_lifecycle(void) {
+static void test_status_lifecycle(const char *url) {
     fiaisdk_sdk *sdk = create_sdk();
     fiaisdk_network_status status = FIAISDK_NETWORK_STATUS_INIT;
 
@@ -71,10 +78,10 @@ static void test_status_lifecycle(void) {
     CHECK(status.latency_ms == 0);
     CHECK(status.connected_at_unix_ms == 0);
 
-    CHECK(fiaisdk_network_connect(sdk, "https://node.example.com", 5000) == FIAISDK_STATUS_OK);
+    CHECK(fiaisdk_network_connect(sdk, url, 5000) == FIAISDK_STATUS_OK);
     CHECK(fiaisdk_network_get_status(sdk, &status) == FIAISDK_STATUS_OK);
     CHECK(status.state == FIAISDK_NETWORK_STATE_CONNECTED);
-    CHECK(status.latency_ms >= 5 && status.latency_ms <= 49);
+    CHECK(status.latency_ms <= 5000);
     CHECK(status.connected_at_unix_ms > 1600000000000LL);        /* after Sep 2020 */
     CHECK(status.struct_size == sizeof(fiaisdk_network_status)); /* untouched */
 
@@ -86,7 +93,7 @@ static void test_status_lifecycle(void) {
     fiaisdk_sdk_destroy(sdk);
 }
 
-static void test_status_struct_size_rules(void) {
+static void test_status_struct_size_rules(const char *url) {
     fiaisdk_sdk *sdk = create_sdk();
     fiaisdk_network_status status = FIAISDK_NETWORK_STATUS_INIT;
     struct future_status {
@@ -97,7 +104,7 @@ static void test_status_struct_size_rules(void) {
     status.struct_size = FIAISDK_NETWORK_STATUS_V1_SIZE - 1U;
     CHECK(fiaisdk_network_get_status(sdk, &status) == FIAISDK_STATUS_INVALID_ARGUMENT);
 
-    CHECK(fiaisdk_network_connect(sdk, "https://node.example.com", 5000) == FIAISDK_STATUS_OK);
+    CHECK(fiaisdk_network_connect(sdk, url, 5000) == FIAISDK_STATUS_OK);
     memset(&future, 0xAB, sizeof(future));
     future.v1.struct_size = (uint32_t)sizeof(future);
     CHECK(fiaisdk_network_get_status(sdk, &future.v1) == FIAISDK_STATUS_OK);
@@ -108,9 +115,9 @@ static void test_status_struct_size_rules(void) {
     fiaisdk_sdk_destroy(sdk);
 }
 
-static void test_get_endpoint_size_protocol(void) {
+static void test_get_endpoint_size_protocol(const char *url) {
     fiaisdk_sdk *sdk = create_sdk();
-    const char *expected = "https://node.example.com:8443/rpc";
+    const char *expected = url;
     char small[8];
     char exact[64];
     size_t size = 0;
@@ -122,8 +129,7 @@ static void test_get_endpoint_size_protocol(void) {
     CHECK(fiaisdk_network_get_endpoint(sdk, exact, &size) == FIAISDK_STATUS_OK);
     CHECK(exact[0] == '\0');
 
-    CHECK(fiaisdk_network_connect(sdk, "HTTPS://Node.Example.com:8443/rpc", 5000) ==
-          FIAISDK_STATUS_OK);
+    CHECK(fiaisdk_network_connect(sdk, url, 5000) == FIAISDK_STATUS_OK);
 
     size = 0;
     CHECK(fiaisdk_network_get_endpoint(sdk, NULL, &size) == FIAISDK_STATUS_BUFFER_TOO_SMALL);
@@ -142,9 +148,9 @@ static void test_get_endpoint_size_protocol(void) {
     fiaisdk_sdk_destroy(sdk);
 }
 
-static void test_destroy_while_connected(void) {
+static void test_destroy_while_connected(const char *url) {
     fiaisdk_sdk *sdk = create_sdk();
-    CHECK(fiaisdk_network_connect(sdk, "wss://node.example.com", 5000) == FIAISDK_STATUS_OK);
+    CHECK(fiaisdk_network_connect(sdk, url, 5000) == FIAISDK_STATUS_OK);
     fiaisdk_sdk_destroy(sdk); /* must shut the module down cleanly (checked by ASan) */
 }
 
@@ -152,9 +158,15 @@ int main(void) {
     test_layout_is_frozen();
     test_rejects_null_arguments();
     test_connect_validation();
-    test_status_lifecycle();
-    test_status_struct_size_rules();
-    test_get_endpoint_size_protocol();
-    test_destroy_while_connected();
+    const loopback_listener listener = test_open_loopback(1);
+    CHECK(listener.socket != TEST_BAD_SOCKET);
+    if (listener.socket == TEST_BAD_SOCKET) {
+        return TEST_RESULT();
+    }
+    test_status_lifecycle(listener.url);
+    test_status_struct_size_rules(listener.url);
+    test_get_endpoint_size_protocol(listener.url);
+    test_destroy_while_connected(listener.url);
+    test_close_loopback(listener);
     return TEST_RESULT();
 }

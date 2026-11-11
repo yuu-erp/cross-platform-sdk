@@ -15,6 +15,5 @@ recoverable signatures (r||s||recovery-id 0..3). No aggregate, encryption or tra
 The provider owns a private OpenSSL context, cleans per-thread resources after each call and
 never changes host defaults. Its secp context is randomized once before publication, then
 read-only. Secret scalars/IKM use wiping buffers; errors never include key material.
-Methods are thread-safe; destruction must not race calls. Stateless facade construction is
-available before module initialization so composition root can wire dependent modules; no
-consumer is exposed through the C ABI until SDK initialization completes.
+Methods are thread-safe; destruction must not race calls. The facade is created during module initialization and released during shutdown. Composition
+registers crypto before wallet so the wallet can obtain the initialized facade.

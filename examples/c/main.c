@@ -2,9 +2,7 @@
  *
  *   fiaisdk_example_c [endpoint-url]
  *
- * Default endpoint: https://node.example.com/rpc. Try "https://down.invalid" to see an
- * unreachable node, or "http://node.example.com" to see the TLS policy reject it.
- * NOTE: the network transport is simulated in this version (no real I/O).
+ * Pass a listening TCP endpoint such as tcp://127.0.0.1:9545 to exercise the network.
  */
 #include <fiaisdk/fiaisdk.h>
 
@@ -17,7 +15,7 @@ static int fail(const char *what, fiaisdk_status status) {
 }
 
 int main(int argc, char **argv) {
-    const char *url = argc > 1 ? argv[1] : "https://node.example.com/rpc";
+    const char *url = argc > 1 ? argv[1] : NULL;
 
     fiaisdk_sdk_config config = FIAISDK_SDK_CONFIG_INIT;
     config.application_name = "c-example";
@@ -76,6 +74,10 @@ int main(int argc, char **argv) {
         printf("Offline BLS/secp256k1 signatures verified\n");
     }
 
+    if (url == NULL) {
+        fiaisdk_sdk_destroy(sdk);
+        return 0;
+    }
     status = fiaisdk_network_connect(sdk, url, 5000);
     if (status != FIAISDK_STATUS_OK) {
         fiaisdk_sdk_destroy(sdk);

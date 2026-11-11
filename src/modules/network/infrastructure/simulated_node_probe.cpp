@@ -18,8 +18,8 @@ std::chrono::milliseconds SimulatedNodeProbe::simulatedLatency(const std::string
     return std::chrono::milliseconds(kMinMs + (hash % kSpreadMs));
 }
 
-core::Result<ProbeResult> SimulatedNodeProbe::probe(const Endpoint &endpoint,
-                                                    std::chrono::milliseconds timeout) {
+core::Result<OpenedConnection> SimulatedNodeProbe::open(const Endpoint &endpoint,
+                                                        std::chrono::milliseconds timeout) {
     constexpr std::string_view kUnreachableSuffix = ".invalid";
     const std::string &host = endpoint.host();
     if (host.size() >= kUnreachableSuffix.size() &&
@@ -33,7 +33,7 @@ core::Result<ProbeResult> SimulatedNodeProbe::probe(const Endpoint &endpoint,
                                         std::to_string(timeout.count()) +
                                         " ms: " + endpoint.origin() + " (simulated)");
     }
-    return ProbeResult{latency};
+    return OpenedConnection{latency};
 }
 
 } // namespace fiaisdk::network

@@ -6,7 +6,7 @@
 #include "modules/crypto/api/crypto_module.h"
 #include "modules/crypto/infrastructure/library_crypto_provider.h"
 #include "modules/network/api/network_module.h"
-#include "modules/network/infrastructure/simulated_node_probe.h"
+#include "modules/network/infrastructure/tcp_node_connector.h"
 #include "modules/smc/api/smc_module.h"
 #include "modules/wallet/api/wallet_module.h"
 
@@ -20,10 +20,8 @@ core::Result<ComposedSdk> composeSdk(core::SdkConfig config) {
     services.logger = std::make_unique<core::NullLogger>(); // until the logging ADR
     services.eventBus = std::make_unique<core::InProcessEventBus>(*services.logger);
 
-    // DEMO transport: replace SimulatedNodeProbe with the real HTTP/WebSocket probe once the
-    // transport ADR is decided. Nothing else changes.
     auto networkModule =
-        std::make_unique<network::NetworkModule>(std::make_unique<network::SimulatedNodeProbe>());
+        std::make_unique<network::NetworkModule>(std::make_unique<network::TcpNodeConnector>());
     network::NetworkModule *network = networkModule.get(); // owned by the registry below
 
     auto cryptoModule =
@@ -39,7 +37,9 @@ core::Result<ComposedSdk> composeSdk(core::SdkConfig config) {
     if (auto added = modules.add(std::move(networkModule)); !added) {
         return added.error();
     }
-    auto walletModule = std::make_unique<wallet::WalletModule>(*crypto->facade());
+    // Wallet requires the initialized crypto facade. The registry initializes in registration
+    // order and shuts down in reverse, so crypto must be registered before wallet.
+    auto walletModule = std::make_unique<wallet::WalletModule>(*crypto);
     wallet::WalletModule *wallet = walletModule.get();
     if (auto added = modules.add(std::move(walletModule)); !added) {
         return added.error();

@@ -8,10 +8,12 @@ class SignWithWallet {
     [[nodiscard]] core::Result<std::vector<std::uint8_t>>
     execute(const Wallet &wallet, crypto::KeyScheme scheme,
             std::span<const std::uint8_t> data) const {
-        if (scheme == crypto::KeyScheme::Bls12381)
+        if (scheme == crypto::KeyScheme::Bls12381) {
             return crypto_->sign(scheme, wallet.blsSecret(), data);
-        if (scheme == crypto::KeyScheme::Secp256k1)
+        }
+        if (scheme == crypto::KeyScheme::Secp256k1) {
             return crypto_->sign(scheme, wallet.secpSecret(), data);
+        }
         return core::Error::invalidArgument("unsupported signing scheme");
     }
 
