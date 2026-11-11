@@ -27,6 +27,12 @@ class LibraryCryptoProvider final : public ICryptoProvider {
                                             std::span<const std::uint8_t> publicKey,
                                             std::span<const std::uint8_t> data,
                                             std::span<const std::uint8_t> signature) const override;
+    [[nodiscard]] core::Result<std::vector<std::uint8_t>>
+    aeadSeal(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> plaintext) const override;
+    [[nodiscard]] core::Result<core::SecureBytes>
+    aeadOpen(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> sealed) const override;
 
   private:
     struct Impl;

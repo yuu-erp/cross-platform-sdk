@@ -125,17 +125,24 @@ class WalletStore {
         throwIfError(fiaisdk_wallet_store_load(handle_, sdk.native(), &address, &wallet));
         return Wallet(sdk.native(), wallet);
     }
+    /// Snapshot of stored addresses. Retries when concurrent saves grow the store between the
+    /// size query and the copy, so it never fails with BUFFER_TOO_SMALL.
     [[nodiscard]] std::vector<Address> addresses() const {
         std::size_t count = 0;
         throwIfError(fiaisdk_wallet_store_list(handle_, nullptr, &count));
-        if (count == 0) {
-            return {};
+        std::vector<Address> output;
+        while (count != 0) {
+            output.resize(count);
+            const auto status = fiaisdk_wallet_store_list(handle_, output.data(), &count);
+            if (status == FIAISDK_STATUS_OK) {
+                output.resize(count);
+                return output;
+            }
+            if (status != FIAISDK_STATUS_BUFFER_TOO_SMALL) {
+                throwIfError(status);
+            }
         }
-        std::vector<Address> output(count);
-        const auto status = fiaisdk_wallet_store_list(handle_, output.data(), &count);
-        throwIfError(status);
-        output.resize(count);
-        return output;
+        return {};
     }
     void remove(const Address &address) const {
         throwIfError(fiaisdk_wallet_store_remove(handle_, &address));

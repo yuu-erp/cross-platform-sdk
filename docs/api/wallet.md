@@ -89,15 +89,15 @@ Generate the key once using `fiaisdk_crypto_random_bytes` and retain it in the a
 secure storage. Reopening requires the same key. The SDK copies it into zeroing memory
 and the caller remains responsible for its own buffer. Keep the path in an
 application-private directory. Wallet addresses are readable in the SQLite file.
-Deletion removes a record from the database and does not revoke open wallet handles or
-erase existing database copies. Archive databases require explicit scalar import and saving
+Deletion overwrites the sealed record in the database file (`secure_delete`), but it does not
+revoke open wallet handles or erase existing copies of the file (backups, sync folders). Archive databases require explicit scalar import and saving
 into a new store.
 
 | C99 function | Contract |
 |---|---|
-| `fiaisdk_wallet_store_open` | Opens or creates a file, initializing schema v1 automatically. A wrong key or unsupported schema version returns `INVALID_ARGUMENT`. |
+| `fiaisdk_wallet_store_open` | Opens or creates a file, initializing schema v1 automatically. A wrong key returns `AUTHENTICATION_FAILED`; an unsupported schema version or a non-wallet database returns `INVALID_ARGUMENT`. |
 | `fiaisdk_wallet_store_save` | Persists an existing created/imported wallet. Duplicate primary address returns `ALREADY_EXISTS`. |
-| `fiaisdk_wallet_store_load` | Loads by the 20-byte primary address and returns an independent wallet handle. Missing address returns `NOT_FOUND`. Invalid authenticated records fail to load. |
+| `fiaisdk_wallet_store_load` | Loads by the 20-byte primary address and returns an independent wallet handle. Missing address returns `NOT_FOUND`. A record that fails authentication (tampered file) returns `INTERNAL_ERROR`. |
 | `fiaisdk_wallet_store_list` | With a NULL buffer, returns the required address count. With a buffer, returns addresses in binary ascending order or `BUFFER_TOO_SMALL` with the new count. |
 | `fiaisdk_wallet_store_remove` | Deletes by primary address. Missing address returns `NOT_FOUND`. |
 | `fiaisdk_wallet_store_close` | Releases the database and wipes the store key. |

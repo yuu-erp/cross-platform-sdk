@@ -5,6 +5,7 @@
 #include "modules/crypto/domain/key_scheme.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -12,6 +13,12 @@
 namespace fiaisdk::crypto {
 
 using Sha256Digest = std::array<std::uint8_t, 32>;
+
+/// AES-256-GCM sealed layout: nonce (12) || ciphertext (same size as plaintext) || tag (16).
+inline constexpr std::size_t kAeadKeySize = 32;
+inline constexpr std::size_t kAeadNonceSize = 12;
+inline constexpr std::size_t kAeadTagSize = 16;
+inline constexpr std::size_t kAeadOverhead = kAeadNonceSize + kAeadTagSize;
 
 /// Primitive provider boundary. Implementations must be thread-safe; errors contain no secrets.
 class ICryptoProvider {
@@ -39,6 +46,14 @@ class ICryptoProvider {
     /// On failure the caller must discard/wipe the entire output.
     [[nodiscard]] virtual core::Result<void>
     privateRandom(std::span<std::uint8_t> output) const = 0;
+    /// AES-256-GCM with a fresh random 96-bit nonce. Returns nonce || ciphertext || tag.
+    [[nodiscard]] virtual core::Result<std::vector<std::uint8_t>>
+    aeadSeal(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> plaintext) const = 0;
+    /// Opens aeadSeal output. A tag mismatch returns ErrorCode::AuthenticationFailed.
+    [[nodiscard]] virtual core::Result<core::SecureBytes>
+    aeadOpen(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> sealed) const = 0;
 };
 
 } // namespace fiaisdk::crypto

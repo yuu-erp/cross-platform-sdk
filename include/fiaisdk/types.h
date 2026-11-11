@@ -24,10 +24,15 @@ enum {
     FIAISDK_STATUS_MODULE_NOT_FOUND = 3,
     FIAISDK_STATUS_BUFFER_TOO_SMALL = 4,
     FIAISDK_STATUS_OUT_OF_MEMORY = 5,
-    FIAISDK_STATUS_UNAVAILABLE = 6, /* resource unreachable, locked or timed out */
-    FIAISDK_STATUS_INTERNAL_ERROR = 100,
-    FIAISDK_STATUS_NOT_FOUND = 101,
-    FIAISDK_STATUS_ALREADY_EXISTS = 102
+    /* resource unreachable, locked or timed out */
+    FIAISDK_STATUS_UNAVAILABLE = 6,
+    /* requested record does not exist */
+    FIAISDK_STATUS_NOT_FOUND = 7,
+    /* record with the same identity already exists */
+    FIAISDK_STATUS_ALREADY_EXISTS = 8,
+    /* key or credential rejected, e.g. a wrong wallet store key */
+    FIAISDK_STATUS_AUTHENTICATION_FAILED = 9,
+    FIAISDK_STATUS_INTERNAL_ERROR = 100
 };
 
 /** Opaque SDK instance. Created by fiaisdk_sdk_create, released by fiaisdk_sdk_destroy. */

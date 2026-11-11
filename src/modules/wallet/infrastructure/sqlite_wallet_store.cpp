@@ -4,18 +4,17 @@
 #include <array>
 #include <mutex>
 #include <new>
-#include <openssl/crypto.h>
-#include <openssl/evp.h>
-#include <openssl/rand.h>
 #include <sqlite3.h>
+#include <utility>
 
 namespace fiaisdk::wallet {
 namespace {
 
-constexpr int kKeyPairSize = 64;
-constexpr int kNonceSize = 12;
-constexpr int kTagSize = 16;
-using SealedKeys = std::array<std::uint8_t, kNonceSize + kKeyPairSize + kTagSize>;
+constexpr std::size_t kKeyPairSize = 64;
+// Stored layout is crypto's AEAD layout: nonce (12) || ciphertext (64) || tag (16).
+using SealedKeys = std::array<std::uint8_t, kKeyPairSize + crypto::kAeadOverhead>;
+static_assert(std::tuple_size_v<SealedKeys> == 92, "schema v1 stores 92-byte sealed blobs");
+using StoreKey = std::span<const std::uint8_t, crypto::kAeadKeySize>;
 using Database = std::unique_ptr<sqlite3, decltype(&sqlite3_close)>;
 using Statement = std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)>;
 
@@ -53,53 +52,28 @@ template <std::size_t N> bool readBlob(sqlite3_stmt *stmt, std::array<std::uint8
 }
 
 // Address bytes authenticate each wallet's identity. The database key verifier uses empty AAD.
-core::Result<void> crypt(bool encrypt, std::span<const std::uint8_t> key,
-                         std::span<const std::uint8_t> aad, SealedKeys &sealed,
-                         std::span<std::uint8_t> plain) {
-    auto bytes = std::span(sealed);
-    auto nonce = bytes.first<kNonceSize>();
-    auto payload = bytes.subspan<kNonceSize, kKeyPairSize>();
-    auto tag = bytes.last<kTagSize>();
-    const auto fail = core::Error::internal("wallet key encryption operation failed");
-    const auto freeContext = [](OSSL_LIB_CTX *context) {
-        OPENSSL_thread_stop_ex(context);
-        OSSL_LIB_CTX_free(context);
-    };
-    std::unique_ptr<OSSL_LIB_CTX, decltype(freeContext)> context(OSSL_LIB_CTX_new(), freeContext);
-    if (!context || (encrypt && RAND_bytes_ex(context.get(), nonce.data(), nonce.size(), 0) != 1)) {
-        return fail;
+core::Result<SealedKeys> seal(const crypto::CryptoFacade &crypto, StoreKey key,
+                              std::span<const std::uint8_t> aad,
+                              std::span<const std::uint8_t> plain) {
+    auto sealed = crypto.aeadSeal(key, aad, plain);
+    if (!sealed) {
+        return sealed.error();
     }
-    std::unique_ptr<EVP_CIPHER, decltype(&EVP_CIPHER_free)> cipher(
-        EVP_CIPHER_fetch(context.get(), "AES-256-GCM", nullptr), EVP_CIPHER_free);
-    std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(EVP_CIPHER_CTX_new(),
-                                                                        EVP_CIPHER_CTX_free);
-    int written = 0;
-    if (!cipher || !ctx ||
-        EVP_CipherInit_ex(ctx.get(), cipher.get(), nullptr, key.data(), nonce.data(),
-                          encrypt ? 1 : 0) != 1 ||
-        (!aad.empty() && EVP_CipherUpdate(ctx.get(), nullptr, &written, aad.data(),
-                                          static_cast<int>(aad.size())) != 1)) {
-        return fail;
+    SealedKeys output{};
+    if (sealed.value().size() != output.size()) {
+        return core::Error::internal("unexpected sealed wallet size");
     }
-    auto *output = encrypt ? payload.data() : plain.data();
-    const auto *input = encrypt ? plain.data() : payload.data();
-    if (EVP_CipherUpdate(ctx.get(), output, &written, input, kKeyPairSize) != 1 ||
-        written != kKeyPairSize ||
-        (!encrypt &&
-         EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, kTagSize, tag.data()) != 1)) {
-        return fail;
+    std::ranges::copy(sealed.value(), output.begin());
+    return output;
+}
+
+core::Result<core::SecureBytes> open(const crypto::CryptoFacade &crypto, StoreKey key,
+                                     std::span<const std::uint8_t> aad, const SealedKeys &sealed) {
+    auto plain = crypto.aeadOpen(key, aad, sealed);
+    if (plain && plain.value().size() != kKeyPairSize) {
+        return core::Error::internal("unexpected opened wallet size");
     }
-    std::array<std::uint8_t, EVP_MAX_BLOCK_LENGTH> final{};
-    const int verified = EVP_CipherFinal_ex(ctx.get(), final.data(), &written);
-    core::secureZero(final);
-    if (verified != 1) {
-        return encrypt ? fail : core::Error::invalidArgument("wallet key authentication failed");
-    }
-    if (written != 0 || (encrypt && EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_GET_TAG, kTagSize,
-                                                        tag.data()) != 1)) {
-        return fail;
-    }
-    return {};
+    return plain;
 }
 
 core::Result<void> execute(sqlite3 *db, const char *sql) {
@@ -110,7 +84,7 @@ core::Result<void> execute(sqlite3 *db, const char *sql) {
     return {};
 }
 
-core::Result<void> initialize(sqlite3 *db, std::span<const std::uint8_t, 32> key) {
+core::Result<void> initialize(sqlite3 *db, const crypto::CryptoFacade &crypto, StoreKey key) {
     // The caller closes the connection on failure, rolling back any unfinished transaction.
     if (auto begun = execute(db, "BEGIN IMMEDIATE"); !begun) {
         return begun.error();
@@ -127,8 +101,7 @@ core::Result<void> initialize(sqlite3 *db, std::span<const std::uint8_t, 32> key
         }
         version = sqlite3_column_int(stmt.value().get(), 0);
     }
-    core::SecureBytes check(kKeyPairSize);
-    SealedKeys verifier{};
+    const core::SecureBytes check(kKeyPairSize);
     if (version == 0) {
         auto tables = prepare(db, "SELECT 1 FROM sqlite_schema LIMIT 1");
         if (!tables) {
@@ -150,15 +123,17 @@ core::Result<void> initialize(sqlite3 *db, std::span<const std::uint8_t, 32> key
             !schema) {
             return schema.error();
         }
-        if (auto encrypted = crypt(true, key, {}, verifier, check.mutableView()); !encrypted) {
-            return encrypted.error();
+        auto verifier = seal(crypto, key, {}, check.view());
+        if (!verifier) {
+            return verifier.error();
         }
         auto stmt = prepare(db, "INSERT INTO wallet_meta VALUES(1, ?1)");
         if (!stmt) {
             return stmt.error();
         }
-        const int bind = sqlite3_bind_blob(stmt.value().get(), 1, verifier.data(),
-                                           static_cast<int>(verifier.size()), SQLITE_TRANSIENT);
+        const int bind =
+            sqlite3_bind_blob(stmt.value().get(), 1, verifier.value().data(),
+                              static_cast<int>(verifier.value().size()), SQLITE_TRANSIENT);
         if (bind != SQLITE_OK) {
             return sqliteError(bind);
         }
@@ -175,11 +150,20 @@ core::Result<void> initialize(sqlite3 *db, std::span<const std::uint8_t, 32> key
         if (code != SQLITE_ROW) {
             return sqliteError(code);
         }
+        SealedKeys verifier{};
         if (!readBlob(stmt.value().get(), verifier)) {
             return core::Error::internal("invalid wallet database verifier");
         }
-        if (auto verified = crypt(false, key, {}, verifier, check.mutableView()); !verified) {
+        auto verified = open(crypto, key, {}, verifier);
+        if (!verified) {
+            if (verified.error().code == core::ErrorCode::AuthenticationFailed) {
+                return core::Error{core::ErrorCode::AuthenticationFailed,
+                                   "wallet database key rejected"};
+            }
             return verified.error();
+        }
+        if (!core::constantTimeEquals(verified.value().view(), check.view())) {
+            return core::Error::internal("invalid wallet database verifier");
         }
     } else {
         return core::Error::invalidArgument("unsupported wallet database schema version");
@@ -202,8 +186,8 @@ core::Result<Statement> withAddress(sqlite3 *db, const char *sql, const WalletAd
 
 class SqliteWalletStore final : public IWalletStore {
   public:
-    SqliteWalletStore(Database db, std::span<const std::uint8_t, 32> key)
-        : db_(std::move(db)), key_(key) {}
+    SqliteWalletStore(Database db, StoreKey key, std::shared_ptr<const crypto::CryptoFacade> crypto)
+        : db_(std::move(db)), key_(key), crypto_(std::move(crypto)) {}
 
     core::Result<void> save(const Wallet &wallet) override {
         std::lock_guard lock(mutex_);
@@ -217,14 +201,13 @@ class SqliteWalletStore final : public IWalletStore {
         core::SecureBytes plain(kKeyPairSize);
         std::ranges::copy(wallet.blsSecret(), plain.mutableView().first<32>().begin());
         std::ranges::copy(wallet.secpSecret(), plain.mutableView().last<32>().begin());
-        SealedKeys sealed{};
-        if (auto encrypted =
-                crypt(true, key_.view(), wallet.info().address, sealed, plain.mutableView());
-            !encrypted) {
-            return encrypted.error();
+        auto sealed = seal(*crypto_, storeKey(), wallet.info().address, plain.view());
+        if (!sealed) {
+            return sealed.error();
         }
-        const int bound = sqlite3_bind_blob(stmt.value().get(), 2, sealed.data(),
-                                            static_cast<int>(sealed.size()), SQLITE_TRANSIENT);
+        const int bound =
+            sqlite3_bind_blob(stmt.value().get(), 2, sealed.value().data(),
+                              static_cast<int>(sealed.value().size()), SQLITE_TRANSIENT);
         if (bound != SQLITE_OK) {
             return sqliteError(bound);
         }
@@ -252,9 +235,12 @@ class SqliteWalletStore final : public IWalletStore {
             return sqliteError(code);
         }
         SealedKeys sealed{};
-        core::SecureBytes plain(kKeyPairSize);
-        if (!readBlob(stmt.value().get(), sealed) ||
-            !crypt(false, key_.view(), address, sealed, plain.mutableView())) {
+        if (!readBlob(stmt.value().get(), sealed)) {
+            return core::Error::internal("invalid stored wallet record");
+        }
+        auto plain = open(*crypto_, storeKey(), address, sealed);
+        if (!plain) {
+            // The store key was verified at open, so a tag failure means a tampered record.
             return core::Error::internal("stored wallet keys failed authentication");
         }
         return plain;
@@ -298,15 +284,24 @@ class SqliteWalletStore final : public IWalletStore {
     }
 
   private:
+    [[nodiscard]] StoreKey storeKey() const {
+        return key_.view().first<crypto::kAeadKeySize>();
+    }
+
     Database db_;
     core::SecureBytes key_;
+    std::shared_ptr<const crypto::CryptoFacade> crypto_;
     std::mutex mutex_;
 };
 
 } // namespace
 
 core::Result<std::unique_ptr<IWalletStore>>
-openSqliteWalletStore(const char *path, std::span<const std::uint8_t, 32> key) {
+openSqliteWalletStore(const char *path, std::span<const std::uint8_t, 32> key,
+                      std::shared_ptr<const crypto::CryptoFacade> crypto) {
+    if (!crypto) {
+        return core::Error::invalidArgument("wallet store requires a crypto facade");
+    }
     sqlite3 *raw = nullptr;
     const int opened = sqlite3_open_v2(
         path, &raw, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, nullptr);
@@ -321,10 +316,15 @@ openSqliteWalletStore(const char *path, std::span<const std::uint8_t, 32> key) {
         sqlite3_db_config(db.get(), SQLITE_DBCONFIG_ENABLE_VIEW, 0, nullptr) != SQLITE_OK) {
         return core::Error::internal("could not configure wallet database");
     }
-    if (auto initialized = initialize(db.get(), key); !initialized) {
+    // Overwrite deleted sealed records instead of leaving them in free pages.
+    if (auto secure = execute(db.get(), "PRAGMA secure_delete=ON"); !secure) {
+        return secure.error();
+    }
+    if (auto initialized = initialize(db.get(), *crypto, key); !initialized) {
         return initialized.error();
     }
-    std::unique_ptr<IWalletStore> store = std::make_unique<SqliteWalletStore>(std::move(db), key);
+    std::unique_ptr<IWalletStore> store =
+        std::make_unique<SqliteWalletStore>(std::move(db), key, std::move(crypto));
     return store;
 }
 

@@ -82,6 +82,8 @@ FIAISDK_API const char *FIAISDK_CALL fiaisdk_status_message(fiaisdk_status statu
         return "Not found";
     case FIAISDK_STATUS_ALREADY_EXISTS:
         return "Already exists";
+    case FIAISDK_STATUS_AUTHENTICATION_FAILED:
+        return "Authentication failed (key or credential rejected)";
     case FIAISDK_STATUS_INTERNAL_ERROR:
         return "Internal error";
     default:

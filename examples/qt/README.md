@@ -101,13 +101,17 @@ Bấm **Load** rồi **Create SDK**, sau đó mở tab **Wallet**. Cần bản S
    BLS ký trực tiếp byte UTF-8. Với secp256k1, ví dụ tính digest Keccak-256 trước khi ký.
    Kết quả mong đợi là `Signature valid`.
 3. Chọn đường dẫn SQLite thử nghiệm mới, bấm **Generate database key** rồi **Open database**.
-   Bấm **Save wallet** và **List wallets**. Lưu lại cùng địa chỉ trả về `102 (Already exists)`.
+   Bấm **Save wallet** và **List wallets**. Lưu lại cùng địa chỉ trả về `8 (Already exists)`.
 4. Bấm **Close database**, **Destroy wallet** và mở lại database bằng khóa đang có trong ô nhập.
    Chọn địa chỉ trong danh sách rồi bấm **Load selected**. Thử ký lại để kiểm tra ví đã khôi phục.
-   Nhập khóa khác khi mở file sẽ trả về `1 (Invalid argument)`.
+   Nhập khóa khác khi mở file sẽ trả về `9 (Authentication failed ...)`.
 5. Bấm **Remove selected** để xóa bản ghi khỏi SQLite. Dùng **Destroy wallet** để giải phóng
    handle đang mở và **Close database** để đóng file.
 
 Chỉ dùng dữ liệu thử. Các ô nhập khóa được che và khóa không xuất hiện trong log. Khóa database
 sinh từ giao diện chỉ được giữ trong ô nhập của phiên hiện tại. Để mở file ở phiên sau, hãy dùng
 khóa thử nghiệm đã lưu riêng và nhập lại cùng giá trị.
+
+Đây chỉ là ví dụ minh hoạ. Ứng dụng thật không được hiển thị hay cho nhập khóa database dạng hex
+trên giao diện: hãy sinh khóa một lần và cất trong kho bí mật của hệ điều hành (Keychain, DPAPI,
+libsecret), đồng thời xoá bản sao trong bộ nhớ bằng hàm xoá an toàn thay vì `memset`.

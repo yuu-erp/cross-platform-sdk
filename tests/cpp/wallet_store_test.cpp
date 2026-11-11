@@ -3,11 +3,31 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
+#include <iterator>
 #include <memory>
 #include <sqlite3.h>
+#include <thread>
+#include <vector>
 
 namespace {
+
+void runSql(const std::string &path, const char *sql) {
+    sqlite3 *raw = nullptr;
+    const int opened =
+        sqlite3_open_v2(path.c_str(), &raw, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
+    const std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(raw, sqlite3_close);
+    ASSERT_EQ(opened, SQLITE_OK);
+    ASSERT_EQ(sqlite3_exec(db.get(), sql, nullptr, nullptr, nullptr), SQLITE_OK);
+}
+
+fiaisdk_status openStatus(const std::string &path, const fiaisdk::WalletStore::Key &key) {
+    fiaisdk_wallet_store *raw = nullptr;
+    const auto status = fiaisdk_wallet_store_open(path.c_str(), key.data(), key.size(), &raw);
+    fiaisdk_wallet_store_close(raw);
+    return status;
+}
 
 class WalletStoreTest : public testing::Test {
   protected:
@@ -61,7 +81,7 @@ TEST_F(WalletStoreTest, PersistsDualKeyWalletAcrossSdkAndStoreLifetimes) {
     auto wrongKey = key;
     wrongKey.front() ^= 1;
     EXPECT_EQ(fiaisdk_wallet_store_open(path.c_str(), wrongKey.data(), wrongKey.size(), &raw),
-              FIAISDK_STATUS_INVALID_ARGUMENT);
+              FIAISDK_STATUS_AUTHENTICATION_FAILED);
     ASSERT_EQ(raw, nullptr);
     ASSERT_EQ(fiaisdk_wallet_store_open(path.c_str(), key.data(), key.size(), &raw),
               FIAISDK_STATUS_OK);
@@ -129,6 +149,81 @@ TEST_F(WalletStoreTest, RejectsCiphertextMovedToAnotherAddress) {
               FIAISDK_STATUS_INTERNAL_ERROR);
     EXPECT_EQ(loaded, nullptr);
     fiaisdk_wallet_destroy(loaded);
+}
+
+TEST_F(WalletStoreTest, RejectsUnsupportedSchemaAndForeignDatabases) {
+    { const fiaisdk::WalletStore store(path.c_str(), key); }
+    runSql(path, "PRAGMA user_version=2");
+    EXPECT_EQ(openStatus(path, key), FIAISDK_STATUS_INVALID_ARGUMENT);
+
+    const auto foreign = (directory / "foreign.sqlite3").u8string();
+    runSql(foreign, "CREATE TABLE notes(id INTEGER PRIMARY KEY)");
+    EXPECT_EQ(openStatus(foreign, key), FIAISDK_STATUS_INVALID_ARGUMENT);
+}
+
+TEST_F(WalletStoreTest, RemoveOverwritesTheSealedRecord) {
+    const fiaisdk::Wallet wallet(sdk);
+    std::vector<std::uint8_t> sealed;
+    {
+        const fiaisdk::WalletStore store(path.c_str(), key);
+        store.save(wallet);
+    }
+    {
+        sqlite3 *raw = nullptr;
+        ASSERT_EQ(sqlite3_open_v2(path.c_str(), &raw, SQLITE_OPEN_READONLY, nullptr), SQLITE_OK);
+        const std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db(raw, sqlite3_close);
+        sqlite3_stmt *stmtRaw = nullptr;
+        ASSERT_EQ(sqlite3_prepare_v2(db.get(), "SELECT sealed FROM wallets", -1, &stmtRaw, nullptr),
+                  SQLITE_OK);
+        const std::unique_ptr<sqlite3_stmt, decltype(&sqlite3_finalize)> stmt(stmtRaw,
+                                                                              sqlite3_finalize);
+        ASSERT_EQ(sqlite3_step(stmt.get()), SQLITE_ROW);
+        const auto *blob = static_cast<const std::uint8_t *>(sqlite3_column_blob(stmt.get(), 0));
+        sealed.assign(blob, blob + sqlite3_column_bytes(stmt.get(), 0));
+    }
+    ASSERT_EQ(sealed.size(), 92U);
+    const auto fileContains = [&] {
+        std::ifstream file(path, std::ios::binary);
+        const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(file)),
+                                              std::istreambuf_iterator<char>());
+        return std::search(bytes.begin(), bytes.end(), sealed.begin(), sealed.end()) != bytes.end();
+    };
+    ASSERT_TRUE(fileContains());
+    {
+        const fiaisdk::WalletStore store(path.c_str(), key);
+        const auto info = wallet.info();
+        fiaisdk::WalletStore::Address address{};
+        std::copy_n(info.address, sizeof(info.address), address.bytes);
+        store.remove(address);
+    }
+    EXPECT_FALSE(fileContains());
+}
+
+TEST_F(WalletStoreTest, OneStoreIsSafeToUseFromSeveralThreads) {
+    const fiaisdk::WalletStore store(path.c_str(), key);
+    constexpr int kThreads = 4;
+    constexpr int kPerThread = 3;
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kPerThread; ++i) {
+                const fiaisdk::Wallet wallet(sdk);
+                store.save(wallet);
+                const auto info = wallet.info();
+                fiaisdk::WalletStore::Address address{};
+                std::copy_n(info.address, sizeof(info.address), address.bytes);
+                const auto loaded = store.load(sdk, address);
+                const auto loadedInfo = loaded.info();
+                EXPECT_TRUE(std::equal(std::begin(loadedInfo.address), std::end(loadedInfo.address),
+                                       std::begin(info.address)));
+                (void)store.addresses();
+            }
+        });
+    }
+    for (auto &thread : threads) {
+        thread.join();
+    }
+    EXPECT_EQ(store.addresses().size(), static_cast<std::size_t>(kThreads * kPerThread));
 }
 
 } // namespace

@@ -16,7 +16,9 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 namespace fiaisdk::crypto {
 namespace {
@@ -63,6 +65,80 @@ class FailingProvider final : public test::UnavailableCryptoProvider {
         return core::Error::unavailable("provider unavailable");
     }
 };
+
+std::vector<std::uint8_t> fromHex(std::string_view text) {
+    std::vector<std::uint8_t> output;
+    for (std::size_t i = 0; i + 1 < text.size(); i += 2) {
+        output.push_back(
+            static_cast<std::uint8_t>(std::stoi(std::string(text.substr(i, 2)), nullptr, 16)));
+    }
+    return output;
+}
+
+TEST(CryptoAead, OpensPublishedAes256GcmVector) {
+    // NIST GCM spec, test case 14: 256-bit zero key, zero IV, one zero block, no AAD.
+    LibraryCryptoProvider provider;
+    const CryptoFacade crypto(provider);
+    const std::array<std::uint8_t, kAeadKeySize> key{};
+    const auto sealed = fromHex("000000000000000000000000"
+                                "cea7403d4d606b6e074ec5d3baf39d18"
+                                "d0d1c8a799996bf0265b98b5d48ab919");
+    auto opened = crypto.aeadOpen(key, {}, sealed);
+    ASSERT_TRUE(opened);
+    const auto plain = opened.value().view();
+    ASSERT_EQ(plain.size(), 16U);
+    EXPECT_TRUE(std::all_of(plain.begin(), plain.end(), [](auto byte) { return byte == 0; }));
+}
+
+TEST(CryptoAead, RoundTripsWithFreshNoncesAndRejectsTampering) {
+    LibraryCryptoProvider provider;
+    const CryptoFacade crypto(provider);
+    std::array<std::uint8_t, kAeadKeySize> key{};
+    key.fill(0x42);
+    const std::array<std::uint8_t, 4> aad{1, 2, 3, 4};
+    const std::array<std::uint8_t, 64> plain{7};
+    auto first = crypto.aeadSeal(key, aad, plain);
+    auto second = crypto.aeadSeal(key, aad, plain);
+    ASSERT_TRUE(first);
+    ASSERT_TRUE(second);
+    ASSERT_EQ(first.value().size(), plain.size() + kAeadOverhead);
+    EXPECT_FALSE(std::equal(first.value().begin(), first.value().begin() + kAeadNonceSize,
+                            second.value().begin()));
+
+    auto opened = crypto.aeadOpen(key, aad, first.value());
+    ASSERT_TRUE(opened);
+    EXPECT_TRUE(std::ranges::equal(opened.value().view(), plain));
+
+    const auto rejected = [&](std::span<const std::uint8_t> withAad,
+                              std::span<const std::uint8_t> sealed,
+                              std::span<const std::uint8_t, kAeadKeySize> withKey) {
+        auto result = crypto.aeadOpen(withKey, withAad, sealed);
+        return !result && result.error().code == core::ErrorCode::AuthenticationFailed;
+    };
+    auto flipped = first.value();
+    flipped[kAeadNonceSize] ^= 1U;
+    EXPECT_TRUE(rejected(aad, flipped, key));
+    flipped = first.value();
+    flipped.back() ^= 1U;
+    EXPECT_TRUE(rejected(aad, flipped, key));
+    const std::array<std::uint8_t, 4> otherAad{1, 2, 3, 5};
+    EXPECT_TRUE(rejected(otherAad, first.value(), key));
+    auto otherKey = key;
+    otherKey[0] ^= 1U;
+    EXPECT_TRUE(rejected(aad, first.value(), otherKey));
+
+    auto empty = crypto.aeadSeal(key, {}, {});
+    ASSERT_TRUE(empty);
+    ASSERT_EQ(empty.value().size(), kAeadOverhead);
+    auto openedEmpty = crypto.aeadOpen(key, {}, empty.value());
+    ASSERT_TRUE(openedEmpty);
+    EXPECT_TRUE(openedEmpty.value().view().empty());
+
+    const std::array<std::uint8_t, kAeadOverhead - 1> tooShort{};
+    auto shortResult = crypto.aeadOpen(key, {}, tooShort);
+    ASSERT_FALSE(shortResult);
+    EXPECT_EQ(shortResult.error().code, core::ErrorCode::InvalidArgument);
+}
 
 TEST(CryptoUseCases, ValidateRandomSizeBeforeProviderAndPropagateFailure) {
     FailingProvider provider;

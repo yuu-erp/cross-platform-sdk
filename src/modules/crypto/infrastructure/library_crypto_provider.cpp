@@ -67,6 +67,7 @@ struct LibraryCryptoProvider::Impl {
     std::unique_ptr<EVP_MD, decltype(&EVP_MD_free)> sha256{nullptr, EVP_MD_free};
 
     std::unique_ptr<EVP_MD, decltype(&EVP_MD_free)> keccak{nullptr, EVP_MD_free};
+    std::unique_ptr<EVP_CIPHER, decltype(&EVP_CIPHER_free)> aesGcm{nullptr, EVP_CIPHER_free};
     // Avoid libsecp256k1's allocating constructor (whose OOM callback aborts).
     std::vector<std::max_align_t> secpStorage =
         std::vector<std::max_align_t>((secp256k1_context_preallocated_size(SECP256K1_CONTEXT_NONE) +
@@ -85,8 +86,9 @@ struct LibraryCryptoProvider::Impl {
         if (provider) {
             sha256.reset(EVP_MD_fetch(context.get(), "SHA256", nullptr));
             keccak.reset(EVP_MD_fetch(context.get(), "KECCAK-256", nullptr));
+            aesGcm.reset(EVP_CIPHER_fetch(context.get(), "AES-256-GCM", nullptr));
         }
-        if (!sha256 || !keccak || !secp || EVP_MD_get_size(sha256.get()) != 32 ||
+        if (!sha256 || !keccak || !aesGcm || !secp || EVP_MD_get_size(sha256.get()) != 32 ||
             EVP_MD_get_size(keccak.get()) != 32) {
             throw std::runtime_error("required crypto primitive is unavailable");
         }
@@ -308,6 +310,95 @@ core::Result<bool> LibraryCryptoProvider::verify(KeyScheme scheme,
         return std::equal(bytes.begin(), bytes.end(), publicKey.begin());
     }
     return core::Error::invalidArgument("unsupported key scheme");
+}
+
+namespace {
+
+using CipherContext = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
+
+enum class GcmResult : std::uint8_t { Ok, Failed, TagMismatch };
+
+// One GCM pass. Sizes are bounded by SealData/OpenSealedData (<= 1 MiB), so int casts are safe.
+GcmResult runGcm(const EVP_CIPHER *cipher, bool encrypt, std::span<const std::uint8_t> key,
+                 std::span<const std::uint8_t> nonce, std::span<const std::uint8_t> aad,
+                 std::span<const std::uint8_t> input, std::span<std::uint8_t> output,
+                 std::span<std::uint8_t> tag) {
+    const CipherContext ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+    int written = 0;
+    if (!ctx ||
+        EVP_CipherInit_ex(ctx.get(), cipher, nullptr, key.data(), nonce.data(), encrypt ? 1 : 0) !=
+            1 ||
+        (!aad.empty() && EVP_CipherUpdate(ctx.get(), nullptr, &written, aad.data(),
+                                          static_cast<int>(aad.size())) != 1)) {
+        return GcmResult::Failed;
+    }
+    if (!input.empty() && (EVP_CipherUpdate(ctx.get(), output.data(), &written, input.data(),
+                                            static_cast<int>(input.size())) != 1 ||
+                           static_cast<std::size_t>(written) != input.size())) {
+        return GcmResult::Failed;
+    }
+    if (!encrypt && EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG,
+                                        static_cast<int>(tag.size()), tag.data()) != 1) {
+        return GcmResult::Failed;
+    }
+    std::array<std::uint8_t, EVP_MAX_BLOCK_LENGTH> final{};
+    const bool finished = EVP_CipherFinal_ex(ctx.get(), final.data(), &written) == 1;
+    core::secureZero(final);
+    if (!finished) {
+        // For decryption this is the authentication tag check.
+        return encrypt ? GcmResult::Failed : GcmResult::TagMismatch;
+    }
+    if (written != 0 ||
+        (encrypt && EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_GET_TAG,
+                                        static_cast<int>(tag.size()), tag.data()) != 1)) {
+        return GcmResult::Failed;
+    }
+    return GcmResult::Ok;
+}
+
+} // namespace
+
+core::Result<std::vector<std::uint8_t>>
+LibraryCryptoProvider::aeadSeal(std::span<const std::uint8_t, kAeadKeySize> key,
+                                std::span<const std::uint8_t> aad,
+                                std::span<const std::uint8_t> plaintext) const {
+    const ThreadCleanup cleanup(impl_->context.get());
+    std::vector<std::uint8_t> sealed(plaintext.size() + kAeadOverhead);
+    const auto bytes = std::span(sealed);
+    const auto nonce = bytes.first<kAeadNonceSize>();
+    if (RAND_bytes_ex(impl_->context.get(), nonce.data(), nonce.size(), 256) != 1) {
+        return core::Error::unavailable("random nonce source is unavailable");
+    }
+    if (runGcm(impl_->aesGcm.get(), true, key, nonce, aad, plaintext,
+               bytes.subspan(kAeadNonceSize, plaintext.size()),
+               bytes.last<kAeadTagSize>()) != GcmResult::Ok) {
+        return core::Error::unavailable("AES-256-GCM encryption failed");
+    }
+    return sealed;
+}
+
+core::Result<core::SecureBytes>
+LibraryCryptoProvider::aeadOpen(std::span<const std::uint8_t, kAeadKeySize> key,
+                                std::span<const std::uint8_t> aad,
+                                std::span<const std::uint8_t> sealed) const {
+    if (sealed.size() < kAeadOverhead) {
+        return core::Error::invalidArgument("invalid AEAD sealed size");
+    }
+    const ThreadCleanup cleanup(impl_->context.get());
+    // OpenSSL takes a non-const tag pointer for EVP_CTRL_AEAD_SET_TAG; copy it.
+    std::array<std::uint8_t, kAeadTagSize> tag{};
+    std::ranges::copy(sealed.last<kAeadTagSize>(), tag.begin());
+    const auto ciphertext = sealed.subspan(kAeadNonceSize, sealed.size() - kAeadOverhead);
+    core::SecureBytes plaintext(ciphertext.size());
+    const auto result = runGcm(impl_->aesGcm.get(), false, key, sealed.first<kAeadNonceSize>(), aad,
+                               ciphertext, plaintext.mutableView(), tag);
+    if (result == GcmResult::TagMismatch) {
+        return core::Error{core::ErrorCode::AuthenticationFailed, "AEAD authentication failed"};
+    }
+    if (result != GcmResult::Ok) {
+        return core::Error::unavailable("AES-256-GCM decryption failed");
+    }
+    return plaintext;
 }
 
 } // namespace fiaisdk::crypto

@@ -39,7 +39,17 @@ Ubuntu/Debian: `sudo apt install cmake ninja-build g++ python3 pipx clang-tidy` 
 Windows: Visual Studio 2022/2026 (workload "Desktop development with C++"), CMake, Python 3,
 Git for Windows (để chạy `tools/check.sh` trong Git Bash).
 
-Lần configure đầu tiên sẽ tải GoogleTest (cần mạng tới github.com).
+Lần configure đầu tiên sẽ tải GoogleTest, secp256k1, blst (từ github.com) và SQLite (từ
+sqlite.org). Khi không có mạng, trỏ CMake tới mã nguồn đã có sẵn, ví dụ:
+
+```bash
+cmake --preset debug \
+  -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=<thư mục googletest> \
+  -DFETCHCONTENT_SOURCE_DIR_FIAISDK_SQLITE_SOURCE=<thư mục chứa sqlite3.c và sqlite3.h>
+```
+
+Thư mục SQLite có thể lấy lại từ `build/<preset>/_deps/fiaisdk_sqlite_source-src` của một lần
+build trước.
 
 ---
 

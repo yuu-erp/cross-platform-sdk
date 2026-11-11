@@ -28,6 +28,16 @@ class UnavailableCryptoProvider : public crypto::ICryptoProvider {
                               std::span<const std::uint8_t>) const override {
         return failure();
     }
+    core::Result<std::vector<std::uint8_t>>
+    aeadSeal(std::span<const std::uint8_t, crypto::kAeadKeySize>, std::span<const std::uint8_t>,
+             std::span<const std::uint8_t>) const override {
+        return failure();
+    }
+    core::Result<core::SecureBytes> aeadOpen(std::span<const std::uint8_t, crypto::kAeadKeySize>,
+                                             std::span<const std::uint8_t>,
+                                             std::span<const std::uint8_t>) const override {
+        return failure();
+    }
 
   private:
     static core::Error failure() {

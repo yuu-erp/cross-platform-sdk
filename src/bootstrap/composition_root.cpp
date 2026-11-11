@@ -15,9 +15,22 @@
 
 namespace fiaisdk::bootstrap {
 
+namespace {
+
+/// Crypto owned by one wallet store, so a store does not depend on any SDK's lifetime.
+struct StoreCrypto {
+    crypto::LibraryCryptoProvider provider;
+    crypto::CryptoFacade facade{provider};
+};
+
+} // namespace
+
 core::Result<std::unique_ptr<wallet::IWalletStore>>
 openWalletStore(const char *path, std::span<const std::uint8_t, 32> key) {
-    return wallet::openSqliteWalletStore(path, key);
+    // Created once per opened store (not per operation); throws like composeSdk on failure.
+    auto owner = std::make_shared<StoreCrypto>();
+    std::shared_ptr<const crypto::CryptoFacade> facade(owner, &owner->facade);
+    return wallet::openSqliteWalletStore(path, key, std::move(facade));
 }
 
 core::Result<ComposedSdk> composeSdk(core::SdkConfig config) {

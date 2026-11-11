@@ -20,6 +20,10 @@ static void test_status_codes_are_stable(void) {
     CHECK(FIAISDK_STATUS_MODULE_NOT_FOUND == 3);
     CHECK(FIAISDK_STATUS_BUFFER_TOO_SMALL == 4);
     CHECK(FIAISDK_STATUS_OUT_OF_MEMORY == 5);
+    CHECK(FIAISDK_STATUS_UNAVAILABLE == 6);
+    CHECK(FIAISDK_STATUS_NOT_FOUND == 7);
+    CHECK(FIAISDK_STATUS_ALREADY_EXISTS == 8);
+    CHECK(FIAISDK_STATUS_AUTHENTICATION_FAILED == 9);
     CHECK(FIAISDK_STATUS_INTERNAL_ERROR == 100);
     CHECK(sizeof(fiaisdk_status) == 4);
 }
@@ -31,6 +35,10 @@ static void test_status_message_covers_every_code(void) {
                                     FIAISDK_STATUS_MODULE_NOT_FOUND,
                                     FIAISDK_STATUS_BUFFER_TOO_SMALL,
                                     FIAISDK_STATUS_OUT_OF_MEMORY,
+                                    FIAISDK_STATUS_UNAVAILABLE,
+                                    FIAISDK_STATUS_NOT_FOUND,
+                                    FIAISDK_STATUS_ALREADY_EXISTS,
+                                    FIAISDK_STATUS_AUTHENTICATION_FAILED,
                                     FIAISDK_STATUS_INTERNAL_ERROR};
     size_t i;
     for (i = 0; i < sizeof(codes) / sizeof(codes[0]); ++i) {

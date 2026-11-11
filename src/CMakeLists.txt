@@ -10,7 +10,8 @@
 #   fiaisdk                      SHARED  C ABI (bindings) + bootstrap/composition_root.cpp, links everything.
 # Include root for all internal code is src/ ("core/domain/result.h", "modules/wallet/...").
 
-# Shared private dependency of the crypto provider and wallet store (ADR-0007, ADR-0010).
+# Private dependency of the crypto provider (ADR-0006, ADR-0007). The wallet store reaches
+# AES-256-GCM through the crypto facade (ADR-0010).
 set(OPENSSL_USE_STATIC_LIBS TRUE)
 find_package(OpenSSL 3.2...<4 REQUIRED COMPONENTS Crypto)
 

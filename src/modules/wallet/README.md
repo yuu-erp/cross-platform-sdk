@@ -6,7 +6,8 @@ defines the key formats, and [ADR-0010](../../../docs/adr/0010-sqlite-wallet-sto
 
 The domain owns Wallet and WalletInfo. Application owns CreateWallet, ImportWallet,
 SignWithWallet and the IWalletStore port. Infrastructure implements the port with SQLite
-and OpenSSL, and bootstrap selects the adapter. The facade reuses ImportWallet to validate
+and seals secrets through the crypto facade (AES-256-GCM); it does not link OpenSSL itself.
+Bootstrap selects the adapter and gives each store its own crypto provider. The facade reuses ImportWallet to validate
 stored keys and rebuild public metadata. The public store is independent of SDK lifetime.
 
 Each new wallet generates independent keys. Import explicitly supplies two big-endian scalar

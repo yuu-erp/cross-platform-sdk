@@ -1,5 +1,6 @@
 #pragma once
 
+#include "modules/crypto/application/aead.h"
 #include "modules/crypto/application/derive_public_key.h"
 #include "modules/crypto/application/generate_private_key.h"
 #include "modules/crypto/application/generate_random_bytes.h"
@@ -15,7 +16,8 @@ class CryptoFacade {
   public:
     explicit CryptoFacade(const ICryptoProvider &provider) noexcept
         : hash_(provider), random_(provider), keccak_(provider), generateKey_(provider),
-          deriveKey_(provider), sign_(provider), verify_(provider) {}
+          deriveKey_(provider), sign_(provider), verify_(provider), seal_(provider),
+          open_(provider) {}
     [[nodiscard]] core::Result<Sha256Digest> sha256(std::span<const std::uint8_t> input) const {
         return hash_.execute(input);
     }
@@ -44,6 +46,16 @@ class CryptoFacade {
                                             std::span<const std::uint8_t> signature) const {
         return verify_.execute(scheme, publicKey, data, signature);
     }
+    [[nodiscard]] core::Result<std::vector<std::uint8_t>>
+    aeadSeal(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> plaintext) const {
+        return seal_.execute(key, aad, plaintext);
+    }
+    [[nodiscard]] core::Result<core::SecureBytes>
+    aeadOpen(std::span<const std::uint8_t, kAeadKeySize> key, std::span<const std::uint8_t> aad,
+             std::span<const std::uint8_t> sealed) const {
+        return open_.execute(key, aad, sealed);
+    }
 
   private:
     HashSha256 hash_;
@@ -53,6 +65,8 @@ class CryptoFacade {
     DerivePublicKey deriveKey_;
     SignData sign_;
     VerifySignature verify_;
+    SealData seal_;
+    OpenSealedData open_;
 };
 
 } // namespace fiaisdk::crypto

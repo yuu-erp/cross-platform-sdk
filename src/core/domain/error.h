@@ -16,8 +16,12 @@ enum class ErrorCode : std::uint8_t {
     /// A required external resource (node, service, device) cannot be reached or timed out.
     Unavailable,
     Internal,
+    /// The requested record does not exist.
     NotFound,
+    /// A record with the same identity already exists.
     AlreadyExists,
+    /// A key or credential was rejected (authentication tag or verifier mismatch).
+    AuthenticationFailed,
 };
 
 /// Failure value carried by Result<T>.

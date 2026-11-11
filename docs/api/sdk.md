@@ -24,9 +24,10 @@ All functions are `extern "C"`, use the `FIAISDK_CALL` calling convention and ne
 | `FIAISDK_STATUS_BUFFER_TOO_SMALL` | 4 | reserved for caller-buffer outputs |
 | `FIAISDK_STATUS_OUT_OF_MEMORY` | 5 | allocation failed inside the SDK |
 | `FIAISDK_STATUS_UNAVAILABLE` | 6 | resource unreachable, locked or timed out |
+| `FIAISDK_STATUS_NOT_FOUND` | 7 | requested record does not exist |
+| `FIAISDK_STATUS_ALREADY_EXISTS` | 8 | record already exists |
+| `FIAISDK_STATUS_AUTHENTICATION_FAILED` | 9 | key or credential rejected (e.g. wrong wallet store key) |
 | `FIAISDK_STATUS_INTERNAL_ERROR` | 100 | module failed to initialise / unexpected failure |
-| `FIAISDK_STATUS_NOT_FOUND` | 101 | requested record does not exist |
-| `FIAISDK_STATUS_ALREADY_EXISTS` | 102 | record already exists |
 
 ## `fiaisdk_sdk_config`
 

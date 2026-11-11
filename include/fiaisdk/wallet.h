@@ -91,7 +91,8 @@ typedef struct fiaisdk_wallet_address {
  * Open/create a dedicated SQLite file at path (UTF-8, NUL-terminated).
  * key is an application-managed, CSPRNG-generated 32-byte encryption key dedicated to this file.
  * It is copied on success; the caller is responsible for wiping its copy and retaining the key
- * securely across sessions. INVALID_ARGUMENT includes a wrong key or unsupported schema version.
+ * securely across sessions. A wrong key returns AUTHENTICATION_FAILED; an unsupported schema
+ * version or a non-wallet database returns INVALID_ARGUMENT.
  * *out_store is NULL on failure. Release it with fiaisdk_wallet_store_close.
  * Store operations are synchronous and thread-safe, and may block on disk or database locks.
  */
