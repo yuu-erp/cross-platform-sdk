@@ -10,6 +10,10 @@
 #   fiaisdk                      SHARED  C ABI (bindings) + bootstrap/composition_root.cpp, links everything.
 # Include root for all internal code is src/ ("core/domain/result.h", "modules/wallet/...").
 
+# Shared private dependency of the crypto provider and wallet store (ADR-0007, ADR-0010).
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL 3.2...<4 REQUIRED COMPONENTS Crypto)
+
 add_subdirectory(core)
 add_subdirectory(modules/crypto)
 add_subdirectory(modules/network)
@@ -22,6 +26,7 @@ add_subdirectory(modules/smc)
 add_library(fiaisdk SHARED
     bindings/c_api/crypto_c_api.cpp
     bindings/c_api/wallet_c_api.cpp
+    bindings/c_api/wallet_store_c_api.cpp
     bindings/c_api/network_c_api.cpp
     bindings/c_api/sdk_c_api.cpp
     bindings/c_api/status_mapping.cpp
@@ -44,7 +49,7 @@ target_link_libraries(fiaisdk
         fiaisdk_core_infrastructure
         fiaisdk_crypto_infra
         fiaisdk_network_infra
-        fiaisdk_wallet
+        fiaisdk_wallet_infra
         fiaisdk_smc
 )
 

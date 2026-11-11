@@ -21,7 +21,7 @@ OS_DIRS = ("windows", "macos", "linux")
 # Headers that must never appear in domain/ or application/ (I/O, OS, 3rd-party, threads).
 IMPURE_HEADERS = re.compile(
     r"^(windows\.h|winsock2?\.h|unistd\.h|sys/|pthread\.h|dlfcn\.h|fcntl\.h|"
-    r"curl/|openssl/|sodium|secp256k1|nlohmann/|boost/|Q[A-Z]\w*|Qt\w*/|"
+    r"sqlite3\.h|curl/|openssl/|sodium|secp256k1|nlohmann/|boost/|Q[A-Z]\w*|Qt\w*/|"
     r"thread|fstream|iostream|filesystem|random|future)"
 )
 

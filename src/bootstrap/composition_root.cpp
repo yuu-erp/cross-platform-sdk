@@ -9,10 +9,16 @@
 #include "modules/network/infrastructure/tcp_node_connector.h"
 #include "modules/smc/api/smc_module.h"
 #include "modules/wallet/api/wallet_module.h"
+#include "modules/wallet/infrastructure/sqlite_wallet_store.h"
 
 #include <utility>
 
 namespace fiaisdk::bootstrap {
+
+core::Result<std::unique_ptr<wallet::IWalletStore>>
+openWalletStore(const char *path, std::span<const std::uint8_t, 32> key) {
+    return wallet::openSqliteWalletStore(path, key);
+}
 
 core::Result<ComposedSdk> composeSdk(core::SdkConfig config) {
     core::CoreServices services;

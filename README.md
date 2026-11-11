@@ -6,7 +6,7 @@ and a **header-only C++ wrapper** on top of it.
 
 > Status: pre-1.0. `network` opens and owns a real TCP connection. Meta-Node session initialization
 > and an alternate RPC adapter are pending. `crypto` provides hash/random/BLS/secp256k1 operations;
-> `wallet` provides an in-memory offline dual-key wallet; `smc` remains a placeholder.
+> `wallet` provides offline dual-key wallets with optional encrypted SQLite storage; `smc` remains a placeholder.
 
 ## Design in one paragraph
 

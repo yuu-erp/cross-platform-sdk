@@ -8,7 +8,16 @@ int main(void) {
     fiaisdk_sdk *sdk = NULL;
     fiaisdk_wallet *wallet = NULL, *random_wallet = NULL;
     uint8_t key[32] = {0}, digest[32] = {0}, signature[96], valid = 99;
+    fiaisdk_wallet_store *store = NULL;
     fiaisdk_wallet_info info = FIAISDK_WALLET_INFO_INIT;
+    CHECK(sizeof(fiaisdk_wallet_address) == 20);
+    CHECK(fiaisdk_wallet_store_open(":memory:", key, sizeof(key), &store) ==
+              FIAISDK_STATUS_INVALID_ARGUMENT &&
+          store == NULL);
+    CHECK(fiaisdk_wallet_store_open("wallet.sqlite3", key, 31, &store) ==
+              FIAISDK_STATUS_INVALID_ARGUMENT &&
+          store == NULL);
+    fiaisdk_wallet_store_close(NULL);
     CHECK(sizeof(info) == 160 && offsetof(fiaisdk_wallet_info, address) == 117);
     CHECK(fiaisdk_sdk_create(&config, &sdk) == FIAISDK_STATUS_OK);
     CHECK(fiaisdk_wallet_import(sdk, key, 32, key, 32, &wallet) ==

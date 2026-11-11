@@ -1,13 +1,13 @@
 # wallet module
 
-Responsibility: own an in-memory BLS/secp256k1 key pair and expose offline creation, import,
-public metadata and signing without exporting secrets. ADR-0007 defines formats and scope.
-No Archive implementation, mnemonic scheme, database or encryption workflow is copied.
+Wallet owns a BLS/secp256k1 key pair and exposes offline creation, import, public metadata,
+signing and encrypted persistence. [ADR-0007](../../../docs/adr/0007-offline-wallet-key-schemes.md)
+defines the key formats, and [ADR-0010](../../../docs/adr/0010-sqlite-wallet-store.md) defines the store.
 
-Layers: domain Wallet/WalletInfo; application CreateWallet/ImportWallet/SignWithWallet with
-execute(); API facade/module. No infrastructure layer is needed yet: crypto/api provides the
-primitive boundary and keys live only in SecureBytes. No repository, global registry or disk
-persistence is introduced. Depends on crypto (facade only) and core domain/application.
+The domain owns Wallet and WalletInfo. Application owns CreateWallet, ImportWallet,
+SignWithWallet and the IWalletStore port. Infrastructure implements the port with SQLite
+and OpenSSL, and bootstrap selects the adapter. The facade reuses ImportWallet to validate
+stored keys and rebuild public metadata. The public store is independent of SDK lifetime.
 
 Each new wallet generates independent keys. Import explicitly supplies two big-endian scalar
 buffers, validated without clamping. Public metadata includes the secp-based address and BLS

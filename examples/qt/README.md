@@ -1,12 +1,12 @@
-# Ví dụ FiaiSDK Network với Qt
+# Ví dụ FiaiSDK Network và Wallet với Qt
 
 Ví dụ standalone dùng Qt 6 Widgets và Concurrent. Build SDK và CI không build ví dụ Qt.
 Ứng dụng dùng `QLibrary` để nạp FiaiSDK lúc chạy và gọi các hàm C ABI.
-Cửa sổ có các nút thử kết nối và khung log hiển thị kết quả. Thư viện SDK và ứng dụng Qt
+Cửa sổ có hai tab Network và Wallet dùng chung khung log kết quả. Thư viện SDK và ứng dụng Qt
 cần cùng hệ điều hành và kiến trúc CPU.
 
 Chạy các lệnh bên dưới từ **thư mục gốc của repo**, nơi có `CMakePresets.json`.
-Lần cấu hình SDK đầu tiên cần tải các dependency đã ghim từ GitHub.
+Lần cấu hình SDK đầu tiên tải các dependency đã ghim từ GitHub và SQLite.
 
 ## macOS
 
@@ -88,3 +88,26 @@ Sau khi kết nối, app đọc trạng thái mỗi 500 ms và tự ghi
 Để thử, kết nối tới listener `nc` ở trên rồi dừng listener bằng Ctrl+C. Một sự cố mạng im lặng
 có thể chưa được hệ điều hành phát hiện. Socket có dữ liệu chưa đọc cũng có thể trì hoãn việc
 phát hiện EOF.
+
+## Thử wallet offline và SQLite
+
+Bấm **Load** rồi **Create SDK**, sau đó mở tab **Wallet**. Cần bản SDK đã build với API
+`fiaisdk_wallet_store_*`. Nếu thiếu symbol wallet, log báo lý do và tab Network vẫn dùng được.
+
+1. Bấm **Create wallet** để sinh ví mới. Để thử **Import wallet**, điền hai scalar test dưới dạng
+   64 ký tự hex mỗi ô. Ví dụ có thể dùng giá trị `01` được đệm bằng các số 0 ở đầu cho cả hai khóa.
+   **Get wallet info** ghi hai địa chỉ và khóa công khai vào log.
+2. Nhập thông điệp, chọn **BLS12-381** hoặc **secp256k1 (Keccak-256)** rồi bấm **Sign and verify**.
+   BLS ký trực tiếp byte UTF-8. Với secp256k1, ví dụ tính digest Keccak-256 trước khi ký.
+   Kết quả mong đợi là `Signature valid`.
+3. Chọn đường dẫn SQLite thử nghiệm mới, bấm **Generate database key** rồi **Open database**.
+   Bấm **Save wallet** và **List wallets**. Lưu lại cùng địa chỉ trả về `102 (Already exists)`.
+4. Bấm **Close database**, **Destroy wallet** và mở lại database bằng khóa đang có trong ô nhập.
+   Chọn địa chỉ trong danh sách rồi bấm **Load selected**. Thử ký lại để kiểm tra ví đã khôi phục.
+   Nhập khóa khác khi mở file sẽ trả về `1 (Invalid argument)`.
+5. Bấm **Remove selected** để xóa bản ghi khỏi SQLite. Dùng **Destroy wallet** để giải phóng
+   handle đang mở và **Close database** để đóng file.
+
+Chỉ dùng dữ liệu thử. Các ô nhập khóa được che và khóa không xuất hiện trong log. Khóa database
+sinh từ giao diện chỉ được giữ trong ô nhập của phiên hiện tại. Để mở file ở phiên sau, hãy dùng
+khóa thử nghiệm đã lưu riêng và nhập lại cùng giá trị.

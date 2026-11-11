@@ -24,8 +24,10 @@ enum {
     FIAISDK_STATUS_MODULE_NOT_FOUND = 3,
     FIAISDK_STATUS_BUFFER_TOO_SMALL = 4,
     FIAISDK_STATUS_OUT_OF_MEMORY = 5,
-    FIAISDK_STATUS_UNAVAILABLE = 6, /* node/service unreachable or timed out (since 0.1) */
-    FIAISDK_STATUS_INTERNAL_ERROR = 100
+    FIAISDK_STATUS_UNAVAILABLE = 6, /* resource unreachable, locked or timed out */
+    FIAISDK_STATUS_INTERNAL_ERROR = 100,
+    FIAISDK_STATUS_NOT_FOUND = 101,
+    FIAISDK_STATUS_ALREADY_EXISTS = 102
 };
 
 /** Opaque SDK instance. Created by fiaisdk_sdk_create, released by fiaisdk_sdk_destroy. */

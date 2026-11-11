@@ -1,3 +1,5 @@
+#include "wallet_panel.h"
+
 #include <fiaisdk/network.h>
 #include <fiaisdk/sdk.h>
 
@@ -15,6 +17,7 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QTime>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -62,11 +65,11 @@ struct ConnectResult {
     qint64 elapsedMs;
 };
 
-class NetworkWindow final : public QWidget {
+class SdkWindow final : public QWidget {
   public:
-    explicit NetworkWindow(const QString &libraryPath) {
-        setWindowTitle("FiaiSDK Network");
-        resize(820, 510);
+    explicit SdkWindow(const QString &libraryPath) {
+        setWindowTitle("FiaiSDK Qt Test");
+        resize(900, 620);
 
         auto *layout = new QVBoxLayout(this);
         auto *form = new QFormLayout;
@@ -87,18 +90,36 @@ class NetworkWindow final : public QWidget {
         load_ = addButton(libraryRow, "Load", [this] { loadLibrary(); });
         form->addRow("Library", libraryRow);
 
+        auto *sdkActions = new QHBoxLayout;
+        layout->addLayout(sdkActions);
+        create_ = addButton(sdkActions, "Create SDK", [this] { createSdk(); });
+        destroy_ = addButton(sdkActions, "Destroy SDK", [this] { destroySdk(); });
+        sdkActions->addStretch();
+        addButton(sdkActions, "Clear log", [this] { log_->clear(); });
+
+        auto *tabs = new QTabWidget;
+        layout->addWidget(tabs);
+        auto *networkTab = new QWidget;
+        tabs->addTab(networkTab, "Network");
+        auto *networkLayout = new QVBoxLayout(networkTab);
+        auto *networkForm = new QFormLayout;
+        networkLayout->addLayout(networkForm);
+        walletPanel_ = new WalletPanel([this](const QString &message) { log(message); },
+                                       [this](const QString &operation, fiaisdk_status status) {
+                                           logResult(operation, status);
+                                       });
+        tabs->addTab(walletPanel_, "Wallet");
+
         endpoint_ = new QLineEdit("tcp://61.28.233.146:4200");
-        form->addRow("Endpoint", endpoint_);
+        networkForm->addRow("Endpoint", endpoint_);
         timeout_ = new QSpinBox;
         timeout_->setRange(1, 60000);
         timeout_->setValue(5000);
         timeout_->setSuffix(" ms");
-        form->addRow("Connect timeout", timeout_);
+        networkForm->addRow("Connect timeout", timeout_);
 
         auto *actions = new QHBoxLayout;
-        layout->addLayout(actions);
-        create_ = addButton(actions, "Create SDK", [this] { createSdk(); });
-        destroy_ = addButton(actions, "Destroy SDK", [this] { destroySdk(); });
+        networkLayout->addLayout(actions);
         connect_ = addButton(actions, "Connect", [this] { connectToEndpoint(); });
         disconnect_ = addButton(actions, "Disconnect", [this] {
             const auto status = api_.disconnect(sdk_);
@@ -113,7 +134,7 @@ class NetworkWindow final : public QWidget {
             const auto endpoint = readEndpoint();
             log(endpoint.isEmpty() ? "Endpoint is empty" : "Endpoint: " + endpoint);
         });
-        addButton(actions, "Clear log", [this] { log_->clear(); });
+        networkLayout->addStretch();
 
         layout->addWidget(new QLabel("Call log"));
         log_ = new QPlainTextEdit;
@@ -141,8 +162,9 @@ class NetworkWindow final : public QWidget {
         updateButtons();
     }
 
-    ~NetworkWindow() override {
+    ~SdkWindow() override {
         connectWatcher_.waitForFinished();
+        walletPanel_->resetLibrary();
         if (sdk_) {
             api_.destroy(sdk_);
         }
@@ -192,6 +214,7 @@ class NetworkWindow final : public QWidget {
             log("Select a shared library first.");
             return;
         }
+        walletPanel_->resetLibrary();
         if (library_.isLoaded() && !library_.unload()) {
             log("Unload failed: " + library_.errorString());
             return;
@@ -210,6 +233,9 @@ class NetworkWindow final : public QWidget {
         } else {
             log(QString("Loaded %1 (SDK %2)")
                     .arg(library_.fileName(), QString::fromUtf8(api_.version())));
+            if (const auto error = walletPanel_->resolve(library_); !error.isEmpty()) {
+                log("Wallet controls unavailable: " + error);
+            }
         }
         updateButtons();
     }
@@ -217,6 +243,7 @@ class NetworkWindow final : public QWidget {
     void createSdk() {
         const fiaisdk_sdk_config config{sizeof(fiaisdk_sdk_config), "fiaisdk-qt-example", nullptr};
         logResult("fiaisdk_sdk_create", api_.create(&config, &sdk_));
+        walletPanel_->setSdk(sdk_);
         updateButtons();
         if (sdk_) {
             readStatus();
@@ -224,6 +251,7 @@ class NetworkWindow final : public QWidget {
     }
 
     void destroySdk() {
+        walletPanel_->setSdk(nullptr);
         api_.destroy(sdk_);
         sdk_ = nullptr;
         wasConnected_ = false;
@@ -301,6 +329,7 @@ class NetworkWindow final : public QWidget {
     bool connecting_ = false;
     bool wasConnected_ = false;
 
+    WalletPanel *walletPanel_;
     QLineEdit *libraryPath_;
     QLineEdit *endpoint_;
     QSpinBox *timeout_;
@@ -323,7 +352,7 @@ int main(int argc, char **argv) {
     if (libraryPath.isEmpty() && QFileInfo::exists(QStringLiteral(FIAISDK_STAGED_LIBRARY_PATH))) {
         libraryPath = QStringLiteral(FIAISDK_STAGED_LIBRARY_PATH);
     }
-    NetworkWindow window(libraryPath);
+    SdkWindow window(libraryPath);
     window.show();
     return application.exec();
 }

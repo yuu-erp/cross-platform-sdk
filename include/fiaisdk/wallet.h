@@ -29,9 +29,10 @@ typedef struct fiaisdk_wallet_info {
 /**
  * Create an offline wallet with independent BLS and secp256k1 private keys from a CSPRNG.
  * sdk and out_wallet are required, borrowed during the call. *out_wallet is NULL on failure.
- * Caller owns the returned handle and must destroy it. No persistence/mnemonic is provided.
- * Returns OK, INVALID_ARGUMENT, MODULE_NOT_FOUND, UNAVAILABLE, OUT_OF_MEMORY, INTERNAL_ERROR.
- * Thread-safe, synchronous; may block for entropy. Must not race SDK destruction.
+ * Caller owns the returned handle and must destroy it. To persist it, call
+ * fiaisdk_wallet_store_save. Returns OK, INVALID_ARGUMENT, MODULE_NOT_FOUND, UNAVAILABLE,
+ * OUT_OF_MEMORY, INTERNAL_ERROR. Thread-safe, synchronous; may block for entropy. Must not race SDK
+ * destruction.
  */
 FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_wallet_create(const fiaisdk_sdk *sdk,
                                                               fiaisdk_wallet **out_wallet);
@@ -77,6 +78,57 @@ FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_wallet_sign(const fiaisdk_sdk *s
 
 /** Wipe/free wallet. NULL is ignored; must not race calls using it. No live SDK needed. */
 FIAISDK_API void FIAISDK_CALL fiaisdk_wallet_destroy(fiaisdk_wallet *wallet);
+
+/** Owning SQLite wallet database handle, independent of SDK lifetime. */
+typedef struct fiaisdk_wallet_store fiaisdk_wallet_store;
+
+/** Primary (secp256k1-derived) binary wallet address. */
+typedef struct fiaisdk_wallet_address {
+    uint8_t bytes[20];
+} fiaisdk_wallet_address;
+
+/**
+ * Open/create a dedicated SQLite file at path (UTF-8, NUL-terminated).
+ * key is an application-managed, CSPRNG-generated 32-byte encryption key dedicated to this file.
+ * It is copied on success; the caller is responsible for wiping its copy and retaining the key
+ * securely across sessions. INVALID_ARGUMENT includes a wrong key or unsupported schema version.
+ * *out_store is NULL on failure. Release it with fiaisdk_wallet_store_close.
+ * Store operations are synchronous and thread-safe, and may block on disk or database locks.
+ */
+FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_wallet_store_open(const char *path,
+                                                                  const uint8_t *key,
+                                                                  size_t key_size,
+                                                                  fiaisdk_wallet_store **out_store);
+
+/** Close the database and wipe the store key. NULL is accepted. Must not race store operations. */
+FIAISDK_API void FIAISDK_CALL fiaisdk_wallet_store_close(fiaisdk_wallet_store *store);
+
+/** Encrypt and save wallet. An existing primary address returns ALREADY_EXISTS without replacing
+ * it. */
+FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_wallet_store_save(fiaisdk_wallet_store *store,
+                                                                  const fiaisdk_wallet *wallet);
+
+/**
+ * Open a stored wallet as an independent wallet handle. A live SDK is required for key validation.
+ * Returns NOT_FOUND for an absent address. *out_wallet is NULL on failure.
+ */
+FIAISDK_API fiaisdk_status FIAISDK_CALL
+fiaisdk_wallet_store_load(fiaisdk_wallet_store *store, const fiaisdk_sdk *sdk,
+                          const fiaisdk_wallet_address *address, fiaisdk_wallet **out_wallet);
+
+/**
+ * Copy a snapshot of addresses in binary ascending order. inout_count is required and counts
+ * addresses. With NULL addresses, write the required count. Otherwise read capacity from
+ * *inout_count, and write the required count on OK or BUFFER_TOO_SMALL. The output array is
+ * untouched when capacity is insufficient. Re-query/retry if concurrent writes grow the store.
+ */
+FIAISDK_API fiaisdk_status FIAISDK_CALL fiaisdk_wallet_store_list(fiaisdk_wallet_store *store,
+                                                                  fiaisdk_wallet_address *addresses,
+                                                                  size_t *inout_count);
+
+/** Delete a stored record. Returns NOT_FOUND if absent. Existing wallet handles remain valid. */
+FIAISDK_API fiaisdk_status FIAISDK_CALL
+fiaisdk_wallet_store_remove(fiaisdk_wallet_store *store, const fiaisdk_wallet_address *address);
 
 #ifdef __cplusplus
 }

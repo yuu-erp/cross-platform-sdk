@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace fiaisdk {
 
@@ -77,6 +78,8 @@ class Wallet {
     }
 
   private:
+    friend class WalletStore;
+
     Wallet(const fiaisdk_sdk *sdk, fiaisdk_wallet *handle) noexcept : sdk_(sdk), handle_(handle) {}
     static std::string hex(const std::uint8_t (&bytes)[20]) {
         constexpr char kDigits[] = "0123456789abcdef";
@@ -91,4 +94,55 @@ class Wallet {
     const fiaisdk_sdk *sdk_ = nullptr;
     fiaisdk_wallet *handle_ = nullptr;
 };
+/// Move-only SQLite wallet store. Keys are encrypted before SQLite receives them.
+class WalletStore {
+  public:
+    using Key = std::array<std::uint8_t, 32>;
+    using Address = fiaisdk_wallet_address;
+
+    WalletStore(const char *path, const Key &key) {
+        throwIfError(fiaisdk_wallet_store_open(path, key.data(), key.size(), &handle_));
+    }
+    ~WalletStore() {
+        fiaisdk_wallet_store_close(handle_);
+    }
+    WalletStore(const WalletStore &) = delete;
+    WalletStore &operator=(const WalletStore &) = delete;
+    WalletStore(WalletStore &&other) noexcept : handle_(std::exchange(other.handle_, nullptr)) {}
+    WalletStore &operator=(WalletStore &&other) noexcept {
+        if (this != &other) {
+            fiaisdk_wallet_store_close(handle_);
+            handle_ = std::exchange(other.handle_, nullptr);
+        }
+        return *this;
+    }
+
+    void save(const Wallet &wallet) const {
+        throwIfError(fiaisdk_wallet_store_save(handle_, wallet.native()));
+    }
+    [[nodiscard]] Wallet load(const Sdk &sdk, const Address &address) const {
+        fiaisdk_wallet *wallet = nullptr;
+        throwIfError(fiaisdk_wallet_store_load(handle_, sdk.native(), &address, &wallet));
+        return Wallet(sdk.native(), wallet);
+    }
+    [[nodiscard]] std::vector<Address> addresses() const {
+        std::size_t count = 0;
+        throwIfError(fiaisdk_wallet_store_list(handle_, nullptr, &count));
+        if (count == 0) {
+            return {};
+        }
+        std::vector<Address> output(count);
+        const auto status = fiaisdk_wallet_store_list(handle_, output.data(), &count);
+        throwIfError(status);
+        output.resize(count);
+        return output;
+    }
+    void remove(const Address &address) const {
+        throwIfError(fiaisdk_wallet_store_remove(handle_, &address));
+    }
+
+  private:
+    fiaisdk_wallet_store *handle_ = nullptr;
+};
+
 } // namespace fiaisdk

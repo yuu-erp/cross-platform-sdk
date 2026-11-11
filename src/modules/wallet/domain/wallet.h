@@ -9,11 +9,13 @@
 
 namespace fiaisdk::wallet {
 
+using WalletAddress = std::array<std::uint8_t, 20>;
+
 struct WalletInfo {
     std::array<std::uint8_t, 48> blsPublicKey{};
     std::array<std::uint8_t, 65> secpPublicKey{};
-    std::array<std::uint8_t, 20> address{};
-    std::array<std::uint8_t, 20> blsAddress{};
+    WalletAddress address{};
+    WalletAddress blsAddress{};
 };
 
 /// In-memory dual-key wallet. Created only after application/provider validation.

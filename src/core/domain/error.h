@@ -16,6 +16,8 @@ enum class ErrorCode : std::uint8_t {
     /// A required external resource (node, service, device) cannot be reached or timed out.
     Unavailable,
     Internal,
+    NotFound,
+    AlreadyExists,
 };
 
 /// Failure value carried by Result<T>.

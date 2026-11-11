@@ -23,8 +23,10 @@ All functions are `extern "C"`, use the `FIAISDK_CALL` calling convention and ne
 | `FIAISDK_STATUS_MODULE_NOT_FOUND` | 3 | reserved for module-specific calls |
 | `FIAISDK_STATUS_BUFFER_TOO_SMALL` | 4 | reserved for caller-buffer outputs |
 | `FIAISDK_STATUS_OUT_OF_MEMORY` | 5 | allocation failed inside the SDK |
-| `FIAISDK_STATUS_UNAVAILABLE` | 6 | node/service unreachable or timed out (e.g. `fiaisdk_network_connect`) |
+| `FIAISDK_STATUS_UNAVAILABLE` | 6 | resource unreachable, locked or timed out |
 | `FIAISDK_STATUS_INTERNAL_ERROR` | 100 | module failed to initialise / unexpected failure |
+| `FIAISDK_STATUS_NOT_FOUND` | 101 | requested record does not exist |
+| `FIAISDK_STATUS_ALREADY_EXISTS` | 102 | record already exists |
 
 ## `fiaisdk_sdk_config`
 

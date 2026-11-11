@@ -137,3 +137,8 @@ add_test(NAME fiaisdk_wallet_abi_test COMMAND fiaisdk_wallet_abi_test)
 if(MSVC)
     target_compile_options(fiaisdk_wallet_abi_test PRIVATE /wd4127)
 endif()
+
+fiaisdk_add_gtest(fiaisdk_wallet_store_tests
+    SOURCES cpp/wallet_store_test.cpp
+    LIBS FiaiSDK::fiaisdk fiaisdk_sqlite)
+set_target_properties(fiaisdk_wallet_store_tests PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)

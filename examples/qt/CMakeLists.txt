@@ -3,7 +3,7 @@ project(FiaiSdkQtExample LANGUAGES CXX)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent)
 
-qt_add_executable(fiaisdk_example_qt main.cpp)
+qt_add_executable(fiaisdk_example_qt main.cpp wallet_panel.cpp)
 target_compile_features(fiaisdk_example_qt PRIVATE cxx_std_17)
 target_include_directories(fiaisdk_example_qt PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 target_link_libraries(fiaisdk_example_qt PRIVATE Qt6::Widgets Qt6::Concurrent)

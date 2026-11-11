@@ -77,7 +77,11 @@ FIAISDK_API const char *FIAISDK_CALL fiaisdk_status_message(fiaisdk_status statu
     case FIAISDK_STATUS_OUT_OF_MEMORY:
         return "Out of memory";
     case FIAISDK_STATUS_UNAVAILABLE:
-        return "Unavailable (node or service unreachable or timed out)";
+        return "Unavailable (resource unreachable, locked or timed out)";
+    case FIAISDK_STATUS_NOT_FOUND:
+        return "Not found";
+    case FIAISDK_STATUS_ALREADY_EXISTS:
+        return "Already exists";
     case FIAISDK_STATUS_INTERNAL_ERROR:
         return "Internal error";
     default:

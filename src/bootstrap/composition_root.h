@@ -5,10 +5,14 @@
 #include "modules/crypto/api/crypto_facade.h"
 #include "modules/network/api/network_facade.h"
 #include "modules/wallet/api/wallet_facade.h"
+#include "modules/wallet/application/ports/i_wallet_store.h"
 
 #include <memory>
 
 namespace fiaisdk::bootstrap {
+
+[[nodiscard]] core::Result<std::unique_ptr<wallet::IWalletStore>>
+openWalletStore(const char *path, std::span<const std::uint8_t, 32> key);
 
 /// Non-owning pointers to module facades, for the bindings. Valid while `core` is alive
 /// (the modules own the facades; they are released during SdkCore destruction).

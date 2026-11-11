@@ -15,6 +15,10 @@ fiaisdk_status toStatus(const core::Error &error) noexcept {
         return FIAISDK_STATUS_MODULE_NOT_FOUND;
     case core::ErrorCode::Unavailable:
         return FIAISDK_STATUS_UNAVAILABLE;
+    case core::ErrorCode::NotFound:
+        return FIAISDK_STATUS_NOT_FOUND;
+    case core::ErrorCode::AlreadyExists:
+        return FIAISDK_STATUS_ALREADY_EXISTS;
     case core::ErrorCode::ModuleInitFailed:
     case core::ErrorCode::Internal:
         return FIAISDK_STATUS_INTERNAL_ERROR;

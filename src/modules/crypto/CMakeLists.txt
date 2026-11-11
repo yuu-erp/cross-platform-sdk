@@ -1,6 +1,3 @@
-# ADR-0006: a build-provisioned, maintained OpenSSL 3; no runtime headers leak to consumers.
-set(OPENSSL_USE_STATIC_LIBS TRUE)
-find_package(OpenSSL 3.2...<4 REQUIRED COMPONENTS Crypto)
 include(${PROJECT_SOURCE_DIR}/cmake/CryptoDependencies.cmake)
 
 add_library(fiaisdk_crypto_core STATIC api/crypto_module.cpp)
